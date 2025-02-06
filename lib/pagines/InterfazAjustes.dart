@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/EditarUsuario.dart';
+import 'package:recetas360/pagines/Notificaciones.dart'; // Se asume que este archivo define PaginaNotificaciones
 
 class PaginaAjustes extends StatelessWidget {
   const PaginaAjustes({Key? key}) : super(key: key);
@@ -86,7 +87,13 @@ class PaginaAjustes extends StatelessWidget {
                               ),
                             ),
                             onTap: () {
-                              // Acción para notificaciones
+                              // Navega a la página de notificaciones
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const PaginaNotificaciones(),
+                                ),
+                              );
                             },
                           ),
                           const Divider(color: Colors.black26),
