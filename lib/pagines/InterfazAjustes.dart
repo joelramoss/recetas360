@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:recetas360/pagines/EditarUsuario.dart';
-import 'package:recetas360/pagines/Notificaciones.dart'; // Se asume que este archivo define PaginaNotificaciones
+import 'package:recetas360/pagines/Ajustes/EditarUsuario.dart';
+import 'package:recetas360/pagines/Ajustes/Lenguajes.dart';
+import 'package:recetas360/pagines/Ajustes/Notificaciones.dart'; // Se asume que este archivo define PaginaNotificaciones
 
 class PaginaAjustes extends StatelessWidget {
   const PaginaAjustes({Key? key}) : super(key: key);
@@ -87,7 +88,6 @@ class PaginaAjustes extends StatelessWidget {
                               ),
                             ),
                             onTap: () {
-                              // Navega a la página de notificaciones
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -113,7 +113,12 @@ class PaginaAjustes extends StatelessWidget {
                               ),
                             ),
                             onTap: () {
-                              // Acción para cambiar el lenguaje
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const Lenguajes(),
+                                ),
+                              );
                             },
                           ),
                           const SizedBox(height: 20),
