@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:recetas360/pagines/PaginaRegister.dart';
 
 class Paginalogin extends StatelessWidget {
   const Paginalogin({super.key});
@@ -48,7 +49,9 @@ class Paginalogin extends StatelessWidget {
                             width: 180, // Tamaño del logo
                             height: 180,
                           ),
-                          const SizedBox(height: 20), // Espaciado entre la imagen y el título
+                          const SizedBox(
+                              height:
+                                  20), // Espaciado entre la imagen y el título
 
                           // Título de la pantalla (Bienvenido)
                           const Text(
@@ -75,9 +78,11 @@ class Paginalogin extends StatelessWidget {
                               labelText: 'Usuario',
                               labelStyle: const TextStyle(color: Colors.black),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.zero, // Bordes cuadrados
+                                borderRadius:
+                                    BorderRadius.zero, // Bordes cuadrados
                                 borderSide: BorderSide(
-                                  color: Colors.black.withOpacity(0.3), // Borde gris claro
+                                  color: Colors.black
+                                      .withOpacity(0.3), // Borde gris claro
                                 ),
                               ),
                               filled: true,
@@ -93,9 +98,11 @@ class Paginalogin extends StatelessWidget {
                               labelText: 'Contraseña',
                               labelStyle: const TextStyle(color: Colors.black),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.zero, // Bordes cuadrados
+                                borderRadius:
+                                    BorderRadius.zero, // Bordes cuadrados
                                 borderSide: BorderSide(
-                                  color: Colors.black.withOpacity(0.3), // Borde gris claro
+                                  color: Colors.black
+                                      .withOpacity(0.3), // Borde gris claro
                                 ),
                               ),
                               filled: true,
@@ -109,15 +116,18 @@ class Paginalogin extends StatelessWidget {
                             onPressed: () {},
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black, // Botón negro
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 40),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 40),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero, // Bordes cuadrados
+                                borderRadius:
+                                    BorderRadius.zero, // Bordes cuadrados
                               ),
                             ),
                             child: const Text(
                               'Entrar',
                               style: TextStyle(
-                                color: Colors.white, // Texto blanco en el botón negro
+                                color: Colors
+                                    .white, // Texto blanco en el botón negro
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -137,7 +147,15 @@ class Paginalogin extends StatelessWidget {
                                   ),
                                 ),
                                 TextButton(
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const PaginaRegistro(),
+                                      ),
+                                    );
+                                  },
                                   child: const Text(
                                     '¿No tienes Cuenta? Regístrate aquí',
                                     style: TextStyle(color: Colors.black),
