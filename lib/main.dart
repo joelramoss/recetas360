@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';  // Importa la clase Paginalogin
+import 'package:recetas360/pagines/InterfazAjustes.dart';
 
 void main() {
   runApp(MyApp());
