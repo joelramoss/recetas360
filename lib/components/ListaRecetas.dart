@@ -1,28 +1,30 @@
 import 'package:flutter/material.dart';
 
 class ListaRecetas extends StatelessWidget {
-  const ListaRecetas({Key? key}) : super(key: key);
+  final String mainCategory;
+  final String subCategory;
+
+  const ListaRecetas({Key? key, required this.mainCategory, required this.subCategory}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Ejemplo de pantalla donde se muestran las recetas
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mis Recetas"),
+        title: Text("Recetas: $mainCategory - $subCategory"),
         backgroundColor: Colors.orangeAccent,
       ),
       body: Center(
         child: Text(
-          "Aquí se mostrarán todas las recetas",
+          "Aquí se mostrarán las recetas para:\n$mainCategory - $subCategory",
           style: TextStyle(fontSize: 18, color: Colors.grey.shade800),
+          textAlign: TextAlign.center,
         ),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.orangeAccent,
         foregroundColor: Colors.white,
         onPressed: () {
-          // Aquí se podría abrir el formulario de creación de receta.
-          // Por ejemplo, mostrando un diálogo o navegando a otra pantalla.
+          // Aquí se abre el formulario para crear receta.
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
