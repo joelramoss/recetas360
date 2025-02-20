@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:recetas360/pagines/PantallaPrincipal.dart';
 
 class Paginalogin extends StatelessWidget {
   const Paginalogin({super.key});
@@ -106,7 +107,14 @@ class Paginalogin extends StatelessWidget {
 
                           // Botón de Login con bordes cuadrados
                           ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => Pantallaprincipal(),
+                                ),
+                              );
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black, // Botón negro
                               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 40),
@@ -144,15 +152,6 @@ class Paginalogin extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 15),
-
-                                // Botón de Volver con estilo minimalista y bordes cuadrados
-                                TextButton(
-                                  onPressed: () {},
-                                  child: const Text(
-                                    'Volver',
-                                    style: TextStyle(color: Colors.black),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
