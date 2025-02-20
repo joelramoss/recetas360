@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../components/FormularioReceta.dart';
+import 'package:recetas360/components/ListaRecetas.dart';
+
 import '../widgetsutilizados/burbujaestilo.dart';
 
 
