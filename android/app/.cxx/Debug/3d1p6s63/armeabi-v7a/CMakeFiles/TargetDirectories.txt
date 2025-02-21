@@ -1,0 +1,2 @@
+D:/DAM/Recetas360/recetas360/android/app/.cxx/Debug/3d1p6s63/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/DAM/Recetas360/recetas360/android/app/.cxx/Debug/3d1p6s63/armeabi-v7a/CMakeFiles/rebuild_cache.dir

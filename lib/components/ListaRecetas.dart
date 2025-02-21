@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
-import 'receta.dart';
+import 'package:recetas360/components/Receta.dart'; // Asegúrate de que la importación sea correcta
 
-class ListaRecetas extends StatelessWidget {
+class ListaRecetas extends StatefulWidget {
   final String mainCategory;
   final String subCategory;
 
@@ -13,6 +13,11 @@ class ListaRecetas extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  _ListaRecetasState createState() => _ListaRecetasState();
+}
+
+class _ListaRecetasState extends State<ListaRecetas> {
+  @override
   Widget build(BuildContext context) {
     // Lista de recetas de ejemplo
     final List<Receta> recetas = [
@@ -20,9 +25,9 @@ class ListaRecetas extends StatelessWidget {
         nombre: 'Ensalada Mediterránea',
         urlImagen: 'https://via.placeholder.com/150',
         ingredientes: ['Lechuga', 'Tomate', 'Queso feta', 'Aceitunas'],
-        descripcion:
-            'Ensalada fresca con ingredientes típicos del Mediterráneo.',
+        descripcion: 'Ensalada fresca con ingredientes típicos del Mediterráneo.',
         tiempoMinutos: 15,
+        calificacion: 4, // Calificación: 4 estrellas
       ),
       Receta(
         nombre: 'Pizza Casera',
@@ -30,6 +35,7 @@ class ListaRecetas extends StatelessWidget {
         ingredientes: ['Harina', 'Tomate', 'Mozzarella', 'Aceite de oliva'],
         descripcion: 'Pizza con masa hecha a mano y salsa casera.',
         tiempoMinutos: 40,
+        calificacion: 3, // Calificación: 3 estrellas
       ),
       Receta(
         nombre: 'Sopa Asiática',
@@ -37,20 +43,13 @@ class ListaRecetas extends StatelessWidget {
         ingredientes: ['Fideos', 'Caldo', 'Verduras', 'Tofu'],
         descripcion: 'Sopa reconfortante con un toque exótico.',
         tiempoMinutos: 30,
-      ),
-      Receta(
-        nombre: 'Sopa Asiática',
-        urlImagen: 'https://via.placeholder.com/150',
-        ingredientes: ['Fideos', 'Caldo', 'Verduras', 'Tofu'],
-        descripcion: 'Sopa reconfortante con un toque exótico.',
-        tiempoMinutos: 30,
+        calificacion: 5, // Calificación: 5 estrellas
       ),
     ];
 
-    // Usamos itemCount = recetas.length + 1 para incluir el botón de +
     return Scaffold(
       appBar: AppBar(
-        title: Text("Recetas: $mainCategory - $subCategory"),
+        title: Text("Recetas: ${widget.mainCategory} - ${widget.subCategory}"),
         backgroundColor: Colors.orangeAccent,
       ),
       body: Container(
@@ -96,7 +95,35 @@ class ListaRecetas extends StatelessWidget {
                     receta.nombre,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text("Tiempo: ${receta.tiempoMinutos} min"),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Tiempo: ${receta.tiempoMinutos} min"),
+                      Row(
+                        children: List.generate(5, (index) {
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                receta.calificacion = index + 1; // Actualiza la calificación
+                              });
+                            },
+                            child: MouseRegion(
+                              onEnter: (_) {
+                                // Mostrar un cambio de color cuando el ratón pasa por encima
+                              },
+                              child: Icon(
+                                index < receta.calificacion
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: Colors.orangeAccent,
+                                size: 30,
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,
