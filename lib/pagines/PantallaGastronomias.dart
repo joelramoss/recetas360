@@ -1,30 +1,26 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:recetas360/pagines/PantallaGastronomias.dart';
+import 'package:recetas360/components/ListaRecetas.dart';
 
 import '../widgetsutilizados/burbujaestilo.dart';
 
-class Pantallaprincipal extends StatefulWidget {
-  const Pantallaprincipal({Key? key}) : super(key: key);
 
+class PantallaGastronomias extends StatefulWidget {
+  final String tipoAlimento;
+  const PantallaGastronomias({Key? key, required this.tipoAlimento}) : super(key: key);
+  
   @override
-  State<Pantallaprincipal> createState() => _PantallaBurbujasState();
+  State<PantallaGastronomias> createState() => _PantallaGastronomiasState();
 }
 
-class _PantallaBurbujasState extends State<Pantallaprincipal>
+class _PantallaGastronomiasState extends State<PantallaGastronomias>
     with SingleTickerProviderStateMixin {
-  // Mapa de categorías: nombre y URL de imagen
-  final Map<String, String> tiposAlimento = {
-    "Carne": "https://loremflickr.com/100/100/meat",
-    "Pescado": "https://loremflickr.com/100/100/fish",
-    "Verduras": "https://loremflickr.com/100/100/vegetables",
-    "Lácteos": "https://loremflickr.com/100/100/dairy",
-    "Cereales": "https://loremflickr.com/100/100/cereals",
-  };
-
+  // Lista de subcategorías
+  final List<String> subcategorias = ["Mediterránea", "Asiática", "Americana", "Africana", "Oceánica"];
+  
   late AnimationController _controller;
   late List<Animation<double>> _bubbleAnimations;
-
+  
   @override
   void initState() {
     super.initState();
@@ -35,38 +31,30 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     _initializeAnimations();
     _controller.forward();
   }
-
+  
   void _initializeAnimations() {
-    final int n = tiposAlimento.length;
+    final int n = subcategorias.length;
     _bubbleAnimations = List.generate(n, (i) {
       double start = i * 0.2;
       double end = start + 0.2;
       return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _controller,
-          curve: Interval(start, end, curve: Curves.easeOutCirc),
-        ),
+        CurvedAnimation(parent: _controller, curve: Interval(start, end, curve: Curves.easeOutCirc)),
       );
     });
   }
-
-  void _restartAnimation() {
-    _controller.reset();
-    _initializeAnimations();
-    _controller.forward();
-  }
-
+  
+  
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Categorías de Alimento"),
+        title: Text("Gastronomías de ${widget.tipoAlimento}"),
         backgroundColor: Colors.orangeAccent,
       ),
       body: Container(
@@ -84,13 +72,10 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
             final double centerX = boxWidth / 2;
             final double centerY = boxHeight / 2;
             final double minSide = math.min(boxWidth, boxHeight);
-            // Ajusta el radio para controlar el espacio entre la central y las exteriores
-            final double radius = minSide * 0.30;
-            // Tamaño de las burbujas exteriores
+            final double radius = minSide * 0.37;
             final double outerBubbleSize = minSide * 0.28;
-            // Tamaño de la burbuja central (más pequeña)
-            final double centerBubbleSize = minSide * 0.25;
-
+            final double centerBubbleSize = minSide * 0.20;
+            
             return Stack(
               children: [
                 ..._buildBurbujas(
@@ -99,15 +84,33 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                   radius: radius,
                   bubbleSize: outerBubbleSize,
                 ),
-                // Burbuja central
                 Positioned(
-                  left: centerX - (centerBubbleSize / 2),
-                  top: centerY - (centerBubbleSize / 2),
-                  child: Burbujawidget(
-                    text: "Comida",
-                    size: centerBubbleSize,
-                    // Puedes dejar onTap vacío o definir acción
-                    onTap: () {},
+                  left: centerX - centerBubbleSize,
+                  top: centerY - centerBubbleSize,
+                  child: Container(
+                    width: centerBubbleSize * 2,
+                    height: centerBubbleSize * 2,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.orangeAccent,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          offset: const Offset(2,2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        widget.tipoAlimento,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -117,7 +120,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
       ),
     );
   }
-
+  
   List<Widget> _buildBurbujas({
     required double centerX,
     required double centerY,
@@ -125,12 +128,10 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     required double bubbleSize,
   }) {
     final List<Widget> bubbles = [];
-    final entries = tiposAlimento.entries.toList();
-    final int n = entries.length;
+    final int n = subcategorias.length;
     for (int i = 0; i < n; i++) {
-      final String tipo = entries[i].key;
-      final String url = entries[i].value;
-      final double angle = -math.pi / 2 + (2 * math.pi * i) / n;
+      final String subcat = subcategorias[i];
+      final double angle = -math.pi/2 + (2 * math.pi * i)/n;
       bubbles.add(
         AnimatedBuilder(
           animation: _bubbleAnimations[i],
@@ -139,8 +140,8 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
             final double x = centerX + radius * value * math.cos(angle);
             final double y = centerY + radius * value * math.sin(angle);
             return Positioned(
-              left: x - (bubbleSize / 2),
-              top: y - (bubbleSize / 2),
+              left: x - (bubbleSize/2),
+              top: y - (bubbleSize/2),
               child: Opacity(
                 opacity: value,
                 child: Transform.scale(scale: value, child: child),
@@ -148,18 +149,18 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
             );
           },
           child: Burbujawidget(
-            text: tipo,
-            imageUrl: url,
+            text: subcat,
             size: bubbleSize,
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PantallaGastronomias(tipoAlimento: tipo),
+                  builder: (_) => ListaRecetas(
+                    mainCategory: widget.tipoAlimento,
+                    subCategory: subcat,
+                  ),
                 ),
-              ).then((_) {
-                _restartAnimation();
-              });
+              );
             },
           ),
         ),
