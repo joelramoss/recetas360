@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/components/apiservice.dart';// Para buscar productos en la API
 import 'producto.dart';          // Modelo de Producto
-import 'receta.dart';            // Modelo de Receta
+import 'Receta.dart';            // Modelo de Receta
 import 'nutritionalifno.dart';   // Contiene la clase NutritionalInfo
                              
 // Función para mostrar el diálogo de selección de producto para un ingrediente

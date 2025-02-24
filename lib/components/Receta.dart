@@ -1,15 +1,10 @@
-import 'package:recetas360/components/producto.dart';
-
 class Receta {
   final String nombre;
   final String urlImagen;
   final List<String> ingredientes;
   final String descripcion;
   final int tiempoMinutos;
-
-  // Agrega un Map para almacenar la selección del producto de cada ingrediente
-  // La clave es el nombre del ingrediente y el valor es el objeto Producto seleccionado.
-  Map<String, Producto>? productosSeleccionados;
+  int calificacion; // Cambié 'final' a 'int' para que sea mutable
 
   Receta({
     required this.nombre,
@@ -17,6 +12,6 @@ class Receta {
     required this.ingredientes,
     required this.descripcion,
     required this.tiempoMinutos,
-    this.productosSeleccionados,
+    required this.calificacion, // Asegúrate de pasar un valor al crear la receta
   });
 }
