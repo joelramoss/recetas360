@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: Paginalogin(), // Aquí se llama la clase Paginalogin
+      home: PaginaAjustes(), // Aquí se llama la clase Paginalogin
     );
   }
 }

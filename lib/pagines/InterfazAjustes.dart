@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/Ajustes/EditarUsuario.dart';
 import 'package:recetas360/pagines/Ajustes/Lenguajes.dart';
 import 'package:recetas360/pagines/Ajustes/Notificaciones.dart'; // Se asume que este archivo define PaginaNotificaciones
+import 'package:recetas360/pagines/PaginaLogin.dart'; // Importa la página de login
 
 class PaginaAjustes extends StatelessWidget {
   const PaginaAjustes({Key? key}) : super(key: key);
@@ -39,7 +40,7 @@ class PaginaAjustes extends StatelessWidget {
                       width: 320, // Ancho del contenedor de ajustes
                       padding: const EdgeInsets.all(20.0),
                       decoration: BoxDecoration(
-                        color: Colors.white, // Fondo blanco para el contenedor
+                        color: Colors.white,
                         borderRadius: BorderRadius.zero, // Bordes cuadrados
                         border: Border.all(
                           color: Colors.black.withOpacity(0.2),
@@ -48,7 +49,7 @@ class PaginaAjustes extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Opción: Editar Usuario con ícono y navegación
+                          // Opción: Editar Usuario
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: const Icon(
@@ -73,7 +74,7 @@ class PaginaAjustes extends StatelessWidget {
                           ),
                           const Divider(color: Colors.black26),
                           
-                          // Opción: Notificaciones con ícono
+                          // Opción: Notificaciones
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: const Icon(
@@ -98,7 +99,7 @@ class PaginaAjustes extends StatelessWidget {
                           ),
                           const Divider(color: Colors.black26),
                           
-                          // Opción: Lenguaje con ícono
+                          // Opción: Lenguaje
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: const Icon(
@@ -123,15 +124,19 @@ class PaginaAjustes extends StatelessWidget {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Botón de Salir (sin ícono)
+                          // Botón "Salir" que navega a PaginaLogin.dart
                           ElevatedButton(
                             onPressed: () {
-                              // Acción para salir
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const Paginalogin(),
+                                ),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black, // Botón negro
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 40),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 40),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.zero, // Bordes cuadrados
                               ),
