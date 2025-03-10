@@ -139,7 +139,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black26,
-                                blurRadius: 4,
+                                blurRadius: 4, 
                                 offset: Offset(2, 2),
                               ),
                             ],
