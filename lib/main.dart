@@ -10,14 +10,13 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-      
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, // Oculta la etiqueta de debug
       title: 'Recetas360',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: Paginalogin(), // Aquí se llama la clase Paginalogin
+      home: Pantallaprincipal(), // Aquí se llama la clase PantallaPrincipal
     );
   }
 }
