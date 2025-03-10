@@ -10,8 +10,9 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-      debugShowCheckedModeBanner: false;
+      
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Recetas360',
       theme: ThemeData(
         primarySwatch: Colors.blue,

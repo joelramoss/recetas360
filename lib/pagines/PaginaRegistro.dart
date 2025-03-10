@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:recetas360/pagines/OlvidoContrasenya.dart';
 import 'package:recetas360/pagines/PantallaPrincipal.dart';
-import 'package:recetas360/pagines/PaginaRegistro.dart'; // Importa tu nueva página
+import 'package:recetas360/pagines/PaginaLogin.dart'; // Importa la página de login
 
 /// OLA INFERIOR #1 (fondo rosa)
 class PinkWaveClipper extends CustomClipper<Path> {
@@ -72,14 +71,14 @@ class PurpleWaveClipper extends CustomClipper<Path> {
   bool shouldReclip(PurpleWaveClipper oldClipper) => false;
 }
 
-class Paginalogin extends StatefulWidget {
-  const Paginalogin({Key? key}) : super(key: key);
+class PaginaRegistro extends StatefulWidget {
+  const PaginaRegistro({Key? key}) : super(key: key);
 
   @override
-  State<Paginalogin> createState() => _PaginaloginState();
+  State<PaginaRegistro> createState() => _PaginaRegistroState();
 }
 
-class _PaginaloginState extends State<Paginalogin> {
+class _PaginaRegistroState extends State<PaginaRegistro> {
   bool rememberMe = false;
 
   // Controladores para campos de texto
@@ -113,19 +112,19 @@ class _PaginaloginState extends State<Paginalogin> {
     final bool camposLlenos = emailController.text.isNotEmpty &&
         passwordController.text.isNotEmpty;
 
-    // Elegimos el color según la condición
-    final Color botonColor = camposLlenos
-        ? Colors.pink.shade300 // Más vivo si hay texto
-        : Colors.pink.shade100; // Rosa claro si están vacíos
+    // Elegimos el color según la condición para el degradado del botón
+    final List<Color> gradientColors = camposLlenos
+        ? [Colors.pink.shade300, Colors.pink.shade100]
+        : [Colors.pink.shade100, Colors.pink.shade100];
 
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 60),
-            // Título "Iniciar Sesión"
+            // Título "Registrarse"
             const Text(
-              "Iniciar Sesión",
+              "Registrarse",
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.bold,
@@ -143,7 +142,8 @@ class _PaginaloginState extends State<Paginalogin> {
                   labelText: 'Ingresa tu correo electrónico',
                   labelStyle: const TextStyle(color: Colors.black87),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    borderSide:
+                        const BorderSide(color: Colors.purple, width: 2),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   enabledBorder: OutlineInputBorder(
@@ -156,17 +156,18 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 20),
 
-            // Campo "Contraseña"
+            // Campo "Crea una contraseña"
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: TextField(
                 controller: passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: 'Contraseña',
+                  labelText: 'Crea una contraseña',
                   labelStyle: const TextStyle(color: Colors.black87),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    borderSide:
+                        const BorderSide(color: Colors.purple, width: 2),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   enabledBorder: OutlineInputBorder(
@@ -179,20 +180,14 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 10),
 
-            // Línea "¿Olvidaste tu contraseña?" clicable
+            // Línea "¿Olvidaste tu contraseña?" (opcional)
             Align(
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: TextButton(
                   onPressed: () {
-                    // Navegar a OlvidarContrasenya.dart
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const OlvidoContrasenya(),
-                      ),
-                    );
+                    // Acción para recuperar la contraseña
                   },
                   child: const Text(
                     '¿Olvidaste tu contraseña?',
@@ -206,7 +201,7 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 10),
 
-            // "Recuérdame" con Switch
+            // "Recuérdame" con Switch (opcional)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
@@ -227,7 +222,7 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 30),
 
-            // Botón "INGRESAR" con color condicional
+            // Botón "REGISTRARSE" con degradado condicional
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: SizedBox(
@@ -236,6 +231,7 @@ class _PaginaloginState extends State<Paginalogin> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (camposLlenos) {
+                      // Lógica de registro o navegación
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -254,14 +250,29 @@ class _PaginaloginState extends State<Paginalogin> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    backgroundColor: botonColor,
+                    padding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
                   ),
-                  child: const Text(
-                    'INGRESAR',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: gradientColors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Container(
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'REGISTRARSE',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -269,9 +280,9 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 30),
 
-            // Texto "También puedes iniciar sesión con ..."
+            // Texto "También puedes registrarte con ..."
             const Text(
-              "También puedes iniciar sesión con ...",
+              "También puedes registrarte con ...",
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 16),
@@ -280,20 +291,19 @@ class _PaginaloginState extends State<Paginalogin> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Solo dejamos Twitter (simulado con alternate_email) y Google
-                _socialIcon(Icons.alternate_email, Colors.lightBlue),
+                _socialIcon(Icons.alternate_email, Colors.lightBlue), // Twitter
                 const SizedBox(width: 20),
-                _socialIcon(Icons.g_mobiledata, Colors.red),
+                _socialIcon(Icons.g_mobiledata, Colors.red), // Google
               ],
             ),
             const SizedBox(height: 30),
 
-            // "¿Aún no tienes cuenta? ¡Regístrate!" -> Navega a PaginaRegistro.dart
+            // "¿Ya tienes cuenta? ¡Inicia Sesión!" -> Navega a PaginaLogin.dart
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  "¿Aún no tienes cuenta? ",
+                  "¿Ya tienes cuenta? ",
                   style: TextStyle(color: Colors.grey),
                 ),
                 GestureDetector(
@@ -301,12 +311,12 @@ class _PaginaloginState extends State<Paginalogin> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PaginaRegistro(),
+                        builder: (_) => const Paginalogin(),
                       ),
                     );
                   },
                   child: const Text(
-                    "¡Regístrate!",
+                    "¡Inicia Sesión!",
                     style: TextStyle(
                       color: Colors.purple,
                       fontWeight: FontWeight.bold,

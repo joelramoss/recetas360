@@ -1,10 +1,9 @@
-// detalle_receta.dart
 import 'package:flutter/material.dart';
-import 'package:recetas360/components/apiservice.dart';// Para buscar productos en la API
+import 'package:recetas360/components/apiservice.dart'; // Para buscar productos en la API
 import 'producto.dart';          // Modelo de Producto
 import 'Receta.dart';            // Modelo de Receta
 import 'nutritionalifno.dart';   // Contiene la clase NutritionalInfo
-                             
+
 // Función para mostrar el diálogo de selección de producto para un ingrediente
 Future<Producto?> showProductoSelection(BuildContext context, String ingrediente) async {
   ApiService apiService = ApiService();
@@ -177,12 +176,34 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                   ),
                   const SizedBox(height: 8),
                   ...widget.receta.ingredientes.map((ing) {
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(ing, style: const TextStyle(fontSize: 16)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.search, color: Colors.orangeAccent),
-                        onPressed: () => _seleccionarProducto(ing),
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        border: Border.all(color: Colors.orangeAccent, width: 1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(ing, style: const TextStyle(fontSize: 16)),
+                          ElevatedButton.icon(
+                            onPressed: () => _seleccionarProducto(ing),
+                            icon: const Icon(Icons.search, size: 24),
+                            label: const Text("Seleccionar"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orangeAccent,
+                              foregroundColor: Colors.white,
+                              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }).toList(),
