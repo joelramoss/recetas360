@@ -14,12 +14,13 @@ class Pantallaprincipal extends StatefulWidget {
 class _PantallaBurbujasState extends State<Pantallaprincipal>
     with SingleTickerProviderStateMixin {
   // Mapa de categorías: nombre y URL de imagen
+  // Aunque tengamos las URLs, no las mostraremos en pantalla
   final Map<String, String> tiposAlimento = {
-    "Carne": "https://loremflickr.com/100/100/meat",
-    "Pescado": "https://loremflickr.com/100/100/fish",
-    "Verduras": "https://loremflickr.com/100/100/vegetables",
-    "Lácteos": "https://loremflickr.com/100/100/dairy",
-    "Cereales": "https://loremflickr.com/100/100/cereals",
+    "Carne": "https://firebasestorage.googleapis.com/v0/b/...carne.jpg",
+    "Pescado": "https://firebasestorage.googleapis.com/v0/b/...pescado.jpg",
+    "Verduras": "https://firebasestorage.googleapis.com/v0/b/...verduras.jpg",
+    "Lácteos": "https://firebasestorage.googleapis.com/v0/b/...lacteos.jpg",
+    "Cereales": "https://firebasestorage.googleapis.com/v0/b/...cereales.jpg",
   };
 
   late AnimationController _controller;
@@ -83,7 +84,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         ],
       ),
       body: Container(
-        // Fondo degradado para toda la pantalla
+        // Fondo degradado
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -96,10 +97,10 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         ),
         child: Column(
           children: [
-            // Encabezado con texto centrado (estilo uniforme)
+            // Encabezado con texto centrado
             Container(
               width: double.infinity,
-              height: 50, // Altura del encabezado
+              height: 50,
               child: const Center(
                 child: Text(
                   "Explora tus categorías",
@@ -118,7 +119,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 ),
               ),
             ),
-            // Espacio flexible para las burbujas animadas
+            // Espacio flexible para las burbujas
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -177,8 +178,8 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
 
     for (int i = 0; i < n; i++) {
       final String tipo = entries[i].key;
-      final String url = entries[i].value;
-      // Distribuir las burbujas en un círculo alrededor de la central
+      final String url = entries[i].value; // URL que no usamos ahora
+      // Distribuimos las burbujas en un círculo
       final double angle = -math.pi / 2 + (2 * math.pi * i) / n;
 
       bubbles.add(
@@ -201,9 +202,9 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
               ),
             );
           },
+          // Pasamos sólo el texto a Burbujawidget, ignorando la URL
           child: Burbujawidget(
             text: tipo,
-            imageUrl: url,
             size: bubbleSize,
             onTap: () {
               Navigator.push(

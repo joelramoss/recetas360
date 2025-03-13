@@ -1,6 +1,5 @@
 // recipe_nutrition_service.dart
 import 'package:recetas360/components/apiservice.dart';
-
 import 'producto.dart';
 
 class NutritionalInfo {
@@ -26,6 +25,28 @@ class NutritionalInfo {
       carbs: carbs + other.carbs,
       fats: fats + other.fats,
       saturatedFats: saturatedFats + other.saturatedFats,
+    );
+  }
+
+  // Convierte la instancia en un Map, para guardar en Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'energy': energy,
+      'proteins': proteins,
+      'carbs': carbs,
+      'fats': fats,
+      'saturatedFats': saturatedFats,
+    };
+  }
+
+  // Crea una instancia a partir de un Map
+  factory NutritionalInfo.fromMap(Map<String, dynamic> map) {
+    return NutritionalInfo(
+      energy: (map['energy'] ?? 0).toDouble(),
+      proteins: (map['proteins'] ?? 0).toDouble(),
+      carbs: (map['carbs'] ?? 0).toDouble(),
+      fats: (map['fats'] ?? 0).toDouble(),
+      saturatedFats: (map['saturatedFats'] ?? 0).toDouble(),
     );
   }
 }

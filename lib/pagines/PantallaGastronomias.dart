@@ -7,19 +7,25 @@ import '../widgetsutilizados/burbujaestilo.dart';
 class PantallaGastronomias extends StatefulWidget {
   final String tipoAlimento;
   const PantallaGastronomias({Key? key, required this.tipoAlimento}) : super(key: key);
-  
+
   @override
   State<PantallaGastronomias> createState() => _PantallaGastronomiasState();
 }
 
 class _PantallaGastronomiasState extends State<PantallaGastronomias>
     with SingleTickerProviderStateMixin {
-  // Lista de subcategorías
-  final List<String> subcategorias = ["Mediterránea", "Asiática", "Americana", "Africana", "Oceánica"];
-  
+  // Ajusta la lista de subcategorías SIN acentos si así las tienes en Firestore
+  final List<String> subcategorias = [
+    "Mediterranea", 
+    "Asiatica", 
+    "Americana", 
+    "Africana", 
+    "Oceanica"
+  ];
+
   late AnimationController _controller;
   late List<Animation<double>> _bubbleAnimations;
-  
+
   @override
   void initState() {
     super.initState();
@@ -30,24 +36,27 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
     _initializeAnimations();
     _controller.forward();
   }
-  
+
   void _initializeAnimations() {
     final int n = subcategorias.length;
     _bubbleAnimations = List.generate(n, (i) {
       double start = i * 0.2;
       double end = start + 0.2;
       return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _controller, curve: Interval(start, end, curve: Curves.easeOutCirc)),
+        CurvedAnimation(
+          parent: _controller,
+          curve: Interval(start, end, curve: Curves.easeOutCirc),
+        ),
       );
     });
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,8 +91,8 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
         ),
         child: Column(
           children: [
-            // Encabezado con texto centrado (estilo uniforme)
-            Container(
+            // Encabezado con texto centrado
+            SizedBox(
               width: double.infinity,
               height: 50,
               child: Center(
@@ -105,7 +114,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
                 ),
               ),
             ),
-            // Espacio flexible para las burbujas animadas
+            // Burbujas animadas
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -117,16 +126,17 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
                   final double radius = minSide * 0.37;
                   final double outerBubbleSize = minSide * 0.28;
                   final double centerBubbleSize = minSide * 0.20;
-                  
+
                   return Stack(
                     children: [
+                      // Burbujas exteriores
                       ..._buildBurbujas(
                         centerX: centerX,
                         centerY: centerY,
                         radius: radius,
                         bubbleSize: outerBubbleSize,
                       ),
-                      // Burbuja central con el nombre principal
+                      // Burbuja central
                       Positioned(
                         left: centerX - centerBubbleSize,
                         top: centerY - centerBubbleSize,
@@ -150,7 +160,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 25
+                                fontSize: 25,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -167,7 +177,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
       ),
     );
   }
-  
+
   List<Widget> _buildBurbujas({
     required double centerX,
     required double centerY,
@@ -176,9 +186,11 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
   }) {
     final List<Widget> bubbles = [];
     final int n = subcategorias.length;
+
     for (int i = 0; i < n; i++) {
       final String subcat = subcategorias[i];
       final double angle = -math.pi / 2 + (2 * math.pi * i) / n;
+
       bubbles.add(
         AnimatedBuilder(
           animation: _bubbleAnimations[i],
@@ -186,6 +198,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
             double value = _bubbleAnimations[i].value;
             final double x = centerX + radius * value * math.cos(angle);
             final double y = centerY + radius * value * math.sin(angle);
+
             return Positioned(
               left: x - (bubbleSize / 2),
               top: y - (bubbleSize / 2),
@@ -202,12 +215,15 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
             text: subcat,
             size: bubbleSize,
             onTap: () {
+              // Imprimimos para confirmar qué valor se está pasando
+              print("Navegando con Categoria: ${widget.tipoAlimento}, Gastronomia: $subcat");
+              
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ListaRecetas(
-                    mainCategory: widget.tipoAlimento,
-                    subCategory: subcat,
+                    mainCategory: widget.tipoAlimento, // "Carne", "Pescado", etc.
+                    subCategory: subcat,              // "Mediterranea", etc.
                   ),
                 ),
               );
@@ -216,6 +232,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
         ),
       );
     }
+
     return bubbles;
   }
 }
