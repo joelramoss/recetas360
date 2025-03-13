@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:recetas360/pagines/OlvidoContrasenya.dart';
 import 'package:recetas360/pagines/PantallaPrincipal.dart';
-import 'package:recetas360/pagines/PaginaRegistro.dart'; // Importa tu nueva página
+import 'package:recetas360/pagines/PaginaRegistro.dart';
 
 /// OLA INFERIOR #1 (fondo rosa)
 class PinkWaveClipper extends CustomClipper<Path> {
@@ -82,38 +83,70 @@ class Paginalogin extends StatefulWidget {
 class _PaginaloginState extends State<Paginalogin> {
   bool rememberMe = false;
 
-  // Controladores para campos de texto
+  // Controladores para los campos de texto
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
     super.initState();
-    // Escuchamos cambios en los campos
     emailController.addListener(_onTextFieldChange);
     passwordController.addListener(_onTextFieldChange);
   }
 
   @override
   void dispose() {
-    // Importante: limpiar los listeners
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
   void _onTextFieldChange() {
-    // Cada vez que cambia un texto, se llama setState para refrescar el botón
     setState(() {});
+  }
+
+  Future<void> _iniciarSesion() async {
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Por favor, completa ambos campos.")),
+      );
+      return;
+    }
+
+    try {
+      // Intentar iniciar sesión con Firebase Authentication
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+
+      // Si el login es exitoso, ir a la pantalla principal
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String mensajeError = "Error al iniciar sesión.";
+      if (e.code == 'user-not-found') {
+        mensajeError = "No existe una cuenta con este correo.";
+      } else if (e.code == 'wrong-password') {
+        mensajeError = "Contraseña incorrecta.";
+      } else if (e.code == 'invalid-email') {
+        mensajeError = "Correo inválido.";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensajeError)),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Condición para ver si ambos campos están llenos
-    final bool camposLlenos = emailController.text.isNotEmpty &&
-        passwordController.text.isNotEmpty;
+    final bool camposLlenos =
+        emailController.text.isNotEmpty && passwordController.text.isNotEmpty;
 
-    // Elegimos el color según la condición
     final Color botonColor = camposLlenos
         ? Colors.pink.shade300 // Más vivo si hay texto
         : Colors.pink.shade100; // Rosa claro si están vacíos
@@ -143,12 +176,13 @@ class _PaginaloginState extends State<Paginalogin> {
                   labelText: 'Ingresa tu correo electrónico',
                   labelStyle: const TextStyle(color: Colors.black87),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    borderSide:
+                        const BorderSide(color: Colors.purple, width: 2),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderSide:
-                        BorderSide(color: Colors.purple.shade200, width: 1),
+                    borderSide: BorderSide(
+                        color: Colors.purple.shade200, width: 1),
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
@@ -166,12 +200,13 @@ class _PaginaloginState extends State<Paginalogin> {
                   labelText: 'Contraseña',
                   labelStyle: const TextStyle(color: Colors.black87),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.purple, width: 2),
+                    borderSide:
+                        const BorderSide(color: Colors.purple, width: 2),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderSide:
-                        BorderSide(color: Colors.purple.shade200, width: 1),
+                    borderSide: BorderSide(
+                        color: Colors.purple.shade200, width: 1),
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
@@ -186,7 +221,6 @@ class _PaginaloginState extends State<Paginalogin> {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: TextButton(
                   onPressed: () {
-                    // Navegar a OlvidarContrasenya.dart
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -234,22 +268,7 @@ class _PaginaloginState extends State<Paginalogin> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (camposLlenos) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const Pantallaprincipal(),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Por favor, completa ambos campos."),
-                        ),
-                      );
-                    }
-                  },
+                  onPressed: _iniciarSesion,
                   style: ElevatedButton.styleFrom(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -276,11 +295,10 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 16),
 
-            // Iconos de redes sociales (sin Facebook)
+            // Iconos de redes sociales (simulados)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Solo dejamos Twitter (simulado con alternate_email) y Google
                 _socialIcon(Icons.alternate_email, Colors.lightBlue),
                 const SizedBox(width: 20),
                 _socialIcon(Icons.g_mobiledata, Colors.red),
@@ -288,7 +306,7 @@ class _PaginaloginState extends State<Paginalogin> {
             ),
             const SizedBox(height: 30),
 
-            // "¿Aún no tienes cuenta? ¡Regístrate!" -> Navega a PaginaRegistro.dart
+            // "¿Aún no tienes cuenta? ¡Regístrate!" -> Navega a PaginaRegistro
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

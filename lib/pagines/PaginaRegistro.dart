@@ -1,32 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Opcional: para guardar más datos en Firestore
+import 'package:recetas360/pagines/PaginaLogin.dart';
 import 'package:recetas360/pagines/PantallaPrincipal.dart';
-import 'package:recetas360/pagines/PaginaLogin.dart'; // Importa la página de login
 
 /// OLA INFERIOR #1 (fondo rosa)
 class PinkWaveClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     Path path = Path();
-    // Empezamos desde la esquina inferior izquierda
     path.moveTo(0, size.height);
-
-    // Primer arco (sube)
     path.quadraticBezierTo(
-      size.width * 0.25,  // Punto de control X
-      size.height * 0.80, // Punto de control Y
-      size.width * 0.50,  // Destino X
-      size.height * 0.90, // Destino Y
+      size.width * 0.25, size.height * 0.80,
+      size.width * 0.50, size.height * 0.90,
     );
-
-    // Segundo arco (baja)
     path.quadraticBezierTo(
-      size.width * 0.75,
-      size.height,
-      size.width,
-      size.height * 0.70,
+      size.width * 0.75, size.height,
+      size.width, size.height * 0.70,
     );
-
-    // Cierra hasta la esquina inferior derecha
     path.lineTo(size.width, size.height);
     path.close();
     return path;
@@ -41,26 +32,15 @@ class PurpleWaveClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     Path path = Path();
-    // Iniciamos un poco más arriba para superponer la ola rosa
     path.moveTo(0, size.height * 0.95);
-
-    // Primer arco
     path.quadraticBezierTo(
-      size.width * 0.25,
-      size.height * 0.75,
-      size.width * 0.50,
-      size.height * 0.85,
+      size.width * 0.25, size.height * 0.75,
+      size.width * 0.50, size.height * 0.85,
     );
-
-    // Segundo arco
     path.quadraticBezierTo(
-      size.width * 0.75,
-      size.height * 0.95,
-      size.width,
-      size.height * 0.60,
+      size.width * 0.75, size.height * 0.95,
+      size.width, size.height * 0.60,
     );
-
-    // Cierra hasta la esquina inferior derecha
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();
@@ -79,40 +59,89 @@ class PaginaRegistro extends StatefulWidget {
 }
 
 class _PaginaRegistroState extends State<PaginaRegistro> {
-  bool rememberMe = false;
-
-  // Controladores para campos de texto
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  // Campo opcional para nombre u otro dato:
+  final TextEditingController nameController = TextEditingController();
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  // Opcional: para guardar más datos en Firestore
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  bool rememberMe = false;
 
   @override
   void initState() {
     super.initState();
-    // Escuchamos cambios en los campos
     emailController.addListener(_onTextFieldChange);
     passwordController.addListener(_onTextFieldChange);
+    nameController.addListener(_onTextFieldChange);
   }
 
   @override
   void dispose() {
-    // Importante: limpiar los listeners
     emailController.dispose();
     passwordController.dispose();
+    nameController.dispose();
     super.dispose();
   }
 
   void _onTextFieldChange() {
-    // Cada vez que cambia un texto, se llama setState para refrescar el botón
     setState(() {});
+  }
+
+  Future<void> _registrarUsuario() async {
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+    String name = nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Por favor, completa todos los campos.")),
+      );
+      return;
+    }
+
+    try {
+      // Crear usuario en Firebase Authentication
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      String uid = userCredential.user!.uid;
+
+      // Opcional: guardar datos adicionales en Firestore
+      await _firestore.collection('usuarios').doc(uid).set({
+        'uid': uid,
+        'nombre': name,
+        'email': email,
+        'fecha_creacion': FieldValue.serverTimestamp(),
+      });
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String mensajeError = "Error al registrar usuario.";
+      if (e.code == 'email-already-in-use') {
+        mensajeError = "Este correo ya está registrado.";
+      } else if (e.code == 'invalid-email') {
+        mensajeError = "Correo inválido.";
+      } else if (e.code == 'weak-password') {
+        mensajeError = "La contraseña es demasiado débil.";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensajeError)),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Condición para ver si ambos campos están llenos
     final bool camposLlenos = emailController.text.isNotEmpty &&
-        passwordController.text.isNotEmpty;
+        passwordController.text.isNotEmpty &&
+        nameController.text.isNotEmpty;
 
-    // Elegimos el color según la condición para el degradado del botón
+    // Degradado condicional para el botón
     final List<Color> gradientColors = camposLlenos
         ? [Colors.pink.shade300, Colors.pink.shade100]
         : [Colors.pink.shade100, Colors.pink.shade100];
@@ -133,6 +162,29 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
             ),
             const SizedBox(height: 30),
 
+            // Campo "Nombre completo"
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Nombre completo',
+                  labelStyle: const TextStyle(color: Colors.black87),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide:
+                        const BorderSide(color: Colors.purple, width: 2),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                        color: Colors.purple.shade200, width: 1),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // Campo "Ingresa tu correo electrónico"
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -147,8 +199,8 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderSide:
-                        BorderSide(color: Colors.purple.shade200, width: 1),
+                    borderSide: BorderSide(
+                        color: Colors.purple.shade200, width: 1),
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
@@ -171,30 +223,9 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderSide:
-                        BorderSide(color: Colors.purple.shade200, width: 1),
+                    borderSide: BorderSide(
+                        color: Colors.purple.shade200, width: 1),
                     borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Línea "¿Olvidaste tu contraseña?" (opcional)
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: TextButton(
-                  onPressed: () {
-                    // Acción para recuperar la contraseña
-                  },
-                  child: const Text(
-                    '¿Olvidaste tu contraseña?',
-                    style: TextStyle(
-                      color: Colors.purple,
-                      fontSize: 14,
-                    ),
                   ),
                 ),
               ),
@@ -229,23 +260,7 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (camposLlenos) {
-                      // Lógica de registro o navegación
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const Pantallaprincipal(),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Por favor, completa ambos campos."),
-                        ),
-                      );
-                    }
-                  },
+                  onPressed: _registrarUsuario,
                   style: ElevatedButton.styleFrom(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -287,18 +302,18 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
             ),
             const SizedBox(height: 16),
 
-            // Iconos de redes sociales (sin Facebook)
+            // Iconos de redes sociales (simulados)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _socialIcon(Icons.alternate_email, Colors.lightBlue), // Twitter
+                _socialIcon(Icons.alternate_email, Colors.lightBlue),
                 const SizedBox(width: 20),
-                _socialIcon(Icons.g_mobiledata, Colors.red), // Google
+                _socialIcon(Icons.g_mobiledata, Colors.red),
               ],
             ),
             const SizedBox(height: 30),
 
-            // "¿Ya tienes cuenta? ¡Inicia Sesión!" -> Navega a PaginaLogin.dart
+            // "¿Ya tienes cuenta? ¡Inicia Sesión!" -> Navega a PaginaLogin
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
