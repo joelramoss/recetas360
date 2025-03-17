@@ -47,3 +47,4 @@ app.*.map.json
 /android/app/google-services.json
 /node_modules/recetas360-dd86c-firebase-adminsdk-fbsvc-6e2fa12fdd.json
 /node_modules
+/functions/index.js
