@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:recetas360/pagines/PaginaLogin.dart';  // Importa la clase Paginalogin
-import 'package:recetas360/pagines/InterfazAjustes.dart';
-import 'package:recetas360/pagines/PantallaPrincipal.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:recetas360/pagines/PaginaLogin.dart';
+import 'firebase_options.dart'; // Asegúrate de que este archivo existe
 
-void main() {
-  runApp(MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions
+        .currentPlatform, // Usa la configuración de Firebase
+  );
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-      debugShowCheckedModeBanner: false;
     return MaterialApp(
+      debugShowCheckedModeBanner: false, // Oculta la etiqueta de debug
       title: 'Recetas360',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true, // Usa Material 3 para un mejor diseño
       ),
-      home: Paginalogin(), // Aquí se llama la clase Paginalogin
+      home: const Paginalogin(), // Usa const para optimizar
     );
   }
 }

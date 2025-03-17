@@ -29,14 +29,14 @@ class Burbujawidget extends StatelessWidget {
             BoxShadow(
               color: Colors.black26,
               blurRadius: 4,
-              offset: const Offset(2, 2),
+              offset: Offset(2, 2),
             ),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Si se pasa URL, muestra la imagen recortada
+            // Si se proporciona una URL, muestra la imagen recortada
             if (imageUrl != null)
               SizedBox(
                 width: size * 0.5,
