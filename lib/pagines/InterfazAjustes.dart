@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/Ajustes/EditarUsuario.dart';
 import 'package:recetas360/pagines/Ajustes/Lenguajes.dart';
-import 'package:recetas360/pagines/Ajustes/Notificaciones.dart'; // Se asume que este archivo define PaginaNotificaciones
-import 'package:recetas360/pagines/PaginaLogin.dart'; // Importa la página de login
+import 'package:recetas360/pagines/Ajustes/Notificaciones.dart';
+import 'package:recetas360/pagines/PaginaLogin.dart';
 
 class PaginaAjustes extends StatelessWidget {
   const PaginaAjustes({Key? key}) : super(key: key);
@@ -10,41 +10,59 @@ class PaginaAjustes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Fondo blanco para un estilo minimalista
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          "Ajustes",
-          style: TextStyle(
-            color: Colors.black, // Texto negro para un buen contraste
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
+      // Fondo degradado para toda la pantalla
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.orangeAccent,
+              Colors.pink.shade100,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-        iconTheme: const IconThemeData(
-          color: Colors.black, // Íconos en negro
-        ),
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(
-                  // Padding para que el contenido no toque los bordes de la pantalla
-                  padding: const EdgeInsets.all(20.0),
-                  child: Center(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Encabezado de 50 px con texto centrado
+              Container(
+                width: double.infinity,
+                height: 50,
+                alignment: Alignment.center,
+                child: const Text(
+                  "Ajustes",
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 4,
+                        color: Colors.black45,
+                        offset: Offset(2, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Contenedor central con Card para el contenido de ajustes
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
                     child: Container(
-                      width: 320, // Ancho del contenedor de ajustes
-                      padding: const EdgeInsets.all(20.0),
+                      width: 320,
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.zero, // Bordes cuadrados
-                        border: Border.all(
-                          color: Colors.black.withOpacity(0.2),
-                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(2, 2),
+                          )
+                        ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -52,10 +70,7 @@ class PaginaAjustes extends StatelessWidget {
                           // Opción: Editar Usuario
                           ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
-                              Icons.person,
-                              color: Colors.black,
-                            ),
+                            leading: const Icon(Icons.person, color: Colors.black),
                             title: const Text(
                               'Editar Usuario',
                               style: TextStyle(
@@ -73,14 +88,10 @@ class PaginaAjustes extends StatelessWidget {
                             },
                           ),
                           const Divider(color: Colors.black26),
-                          
                           // Opción: Notificaciones
                           ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
-                              Icons.notifications,
-                              color: Colors.black,
-                            ),
+                            leading: const Icon(Icons.notifications, color: Colors.black),
                             title: const Text(
                               'Notificaciones',
                               style: TextStyle(
@@ -98,14 +109,10 @@ class PaginaAjustes extends StatelessWidget {
                             },
                           ),
                           const Divider(color: Colors.black26),
-                          
                           // Opción: Lenguaje
                           ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
-                              Icons.language,
-                              color: Colors.black,
-                            ),
+                            leading: const Icon(Icons.language, color: Colors.black),
                             title: const Text(
                               'Lenguaje',
                               style: TextStyle(
@@ -123,8 +130,7 @@ class PaginaAjustes extends StatelessWidget {
                             },
                           ),
                           const SizedBox(height: 20),
-                          
-                          // Botón "Salir" que navega a PaginaLogin.dart
+                          // Botón "Salir"
                           ElevatedButton(
                             onPressed: () {
                               Navigator.pushReplacement(
@@ -135,16 +141,17 @@ class PaginaAjustes extends StatelessWidget {
                               );
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black, // Botón negro
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 40),
+                              backgroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 40),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero, // Bordes cuadrados
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                             child: const Text(
                               'Salir',
                               style: TextStyle(
-                                color: Colors.white, // Texto blanco en el botón negro
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -155,8 +162,8 @@ class PaginaAjustes extends StatelessWidget {
                   ),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
