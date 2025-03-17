@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-// Asegúrate de tener la ruta correcta para la página de ajustes si deseas importarla
-// import 'package:recetas360/pagines/EditarUsuario.dart';
 
 class PaginaNotificaciones extends StatefulWidget {
   const PaginaNotificaciones({Key? key}) : super(key: key);
@@ -15,49 +13,59 @@ class _PaginaNotificacionesState extends State<PaginaNotificaciones> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Fondo blanco para mantener el estilo minimalista
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          "Notificaciones",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
+      // Fondo degradado similar al de PantallaAjustes
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.orangeAccent,
+              Colors.pink.shade100,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-        // Botón de retroceso para volver a la página de Ajustes
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.black,
-          ),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Encabezado de 50 px con texto centrado
+              Container(
+                width: double.infinity,
+                height: 50,
+                alignment: Alignment.center,
+                child: const Text(
+                  "Notificaciones",
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 4,
+                        color: Colors.black45,
+                        offset: Offset(2, 2),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Center(
+              ),
+              // Contenedor central con Card
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
                     child: Container(
-                      width: 320, // Ancho similar al contenedor de la interfaz de ajustes
-                      padding: const EdgeInsets.all(20.0),
+                      width: 320,
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.zero, // Bordes cuadrados
-                        border: Border.all(
-                          color: Colors.black.withOpacity(0.2),
-                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(2, 2),
+                          ),
+                        ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -72,7 +80,6 @@ class _PaginaNotificacionesState extends State<PaginaNotificaciones> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 20),
-                          // Fila que contiene el texto "No", el Switch y el texto "Si"
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -104,17 +111,15 @@ class _PaginaNotificacionesState extends State<PaginaNotificaciones> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          // Botón para volver a la interfaz de ajustes
                           ElevatedButton(
                             onPressed: () {
-                              Navigator.pop(context); // Vuelve a la página anterior (Interfaz de Ajustes)
+                              Navigator.pop(context);
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 40),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 40),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero,
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                             child: const Text(
@@ -131,8 +136,8 @@ class _PaginaNotificacionesState extends State<PaginaNotificaciones> {
                   ),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
