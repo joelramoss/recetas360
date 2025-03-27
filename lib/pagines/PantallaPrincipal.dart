@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
+import 'package:recetas360/pagines/RecetasFavoritas.dart'; // Importa la página RecetasFavoritas
 import '../widgetsutilizados/burbujaestilo.dart';
 
 class Pantallaprincipal extends StatefulWidget {
@@ -14,13 +15,13 @@ class Pantallaprincipal extends StatefulWidget {
 class _PantallaBurbujasState extends State<Pantallaprincipal>
     with SingleTickerProviderStateMixin {
   // Mapa de categorías: nombre y URL de imagen
-  // Aunque tengamos las URLs, no las mostraremos en pantalla
   final Map<String, String> tiposAlimento = {
     "Carne": "https://firebasestorage.googleapis.com/v0/b/...carne.jpg",
     "Pescado": "https://firebasestorage.googleapis.com/v0/b/...pescado.jpg",
     "Verduras": "https://firebasestorage.googleapis.com/v0/b/...verduras.jpg",
     "Lácteos": "https://firebasestorage.googleapis.com/v0/b/...lacteos.jpg",
     "Cereales": "https://firebasestorage.googleapis.com/v0/b/...cereales.jpg",
+    "Favoritos": "https://firebasestorage.googleapis.com/v0/b/...favoritos.jpg", // Nueva categoría de Favoritos
   };
 
   late AnimationController _controller;
@@ -84,7 +85,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         ],
       ),
       body: Container(
-        // Fondo degradado
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -97,7 +97,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         ),
         child: Column(
           children: [
-            // Encabezado con texto centrado
             Container(
               width: double.infinity,
               height: 50,
@@ -119,7 +118,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 ),
               ),
             ),
-            // Espacio flexible para las burbujas
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -129,23 +127,18 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                   final double centerY = boxHeight / 2;
                   final double minSide = math.min(boxWidth, boxHeight);
 
-                  // Radio para posicionar las burbujas alrededor de la central
                   final double radius = minSide * 0.30;
-                  // Tamaño de las burbujas exteriores
                   final double outerBubbleSize = minSide * 0.28;
-                  // Tamaño de la burbuja central
                   final double centerBubbleSize = minSide * 0.25;
 
                   return Stack(
                     children: [
-                      // Burbujas animadas alrededor
                       ..._buildBurbujas(
                         centerX: centerX,
                         centerY: centerY,
                         radius: radius,
                         bubbleSize: outerBubbleSize,
                       ),
-                      // Burbuja central
                       Positioned(
                         left: centerX - (centerBubbleSize / 2),
                         top: centerY - (centerBubbleSize / 2),
@@ -178,8 +171,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
 
     for (int i = 0; i < n; i++) {
       final String tipo = entries[i].key;
-      final String url = entries[i].value; // URL que no usamos ahora
-      // Distribuimos las burbujas en un círculo
+      final String url = entries[i].value;
       final double angle = -math.pi / 2 + (2 * math.pi * i) / n;
 
       bubbles.add(
@@ -202,19 +194,30 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
               ),
             );
           },
-          // Pasamos sólo el texto a Burbujawidget, ignorando la URL
           child: Burbujawidget(
             text: tipo,
             size: bubbleSize,
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PantallaGastronomias(tipoAlimento: tipo),
-                ),
-              ).then((_) {
-                _restartAnimation();
-              });
+              // Agrega una condición para navegar a la página RecetasFavoritas
+              if (tipo == "Favoritos") {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RecetasFavoritas(), // Nueva página
+                  ),
+                ).then((_) {
+                  _restartAnimation();
+                });
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PantallaGastronomias(tipoAlimento: tipo),
+                  ),
+                ).then((_) {
+                  _restartAnimation();
+                });
+              }
             },
           ),
         ),
