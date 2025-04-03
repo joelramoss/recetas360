@@ -5,11 +5,14 @@ import 'firebase_options.dart'; // Asegúrate de que este archivo existe
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializa Firebase
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions
-        .currentPlatform, // Usa la configuración de Firebase
+    options: DefaultFirebaseOptions.currentPlatform,
   );
-
+  
+  // Se eliminó la inicialización del servicio de notificaciones
+  
   runApp(const MyApp());
 }
 

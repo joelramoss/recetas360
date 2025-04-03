@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
+import 'package:recetas360/pagines/HistorialRecetas.dart';
 import '../widgetsutilizados/burbujaestilo.dart';
 
 class Pantallaprincipal extends StatefulWidget {
@@ -70,7 +71,19 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         backgroundColor: Colors.orangeAccent,
         actions: [
           IconButton(
-            iconSize: 46,
+            icon: const Icon(Icons.history, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialRecetas(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            iconSize: 32,
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               Navigator.push(

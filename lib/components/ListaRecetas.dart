@@ -5,6 +5,7 @@ import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/editarReceta.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallacrearReceta.dart';
+import 'package:recetas360/pagines/HistorialRecetas.dart';
 
 class ListaRecetas extends StatefulWidget {
   final String mainCategory;
@@ -36,6 +37,19 @@ class _ListaRecetasState extends State<ListaRecetas> {
       appBar: AppBar(
         backgroundColor: Colors.orangeAccent,
         actions: [
+          // Agregar botón de historial
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialRecetas(),
+                ),
+              );
+            },
+          ),
           IconButton(
             iconSize: 32.0,
             icon: const Icon(Icons.settings, color: Colors.white),

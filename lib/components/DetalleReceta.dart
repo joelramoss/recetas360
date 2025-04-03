@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'Receta.dart';
 import 'nutritionalifno.dart';
+import 'package:recetas360/components/PasosRecetaScreen.dart';
 
 class DetalleReceta extends StatelessWidget {
   final Receta receta;
@@ -184,9 +185,12 @@ class DetalleReceta extends StatelessWidget {
                               ),
                             ),
                             onPressed: () {
-                              // Acción para iniciar la receta
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Receta iniciada")),
+                              // Mantener solo la navegación a la pantalla de pasos
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PasosRecetaScreen(receta: receta),
+                                ),
                               );
                             },
                             child: const Text(
