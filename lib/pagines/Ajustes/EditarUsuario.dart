@@ -12,11 +12,8 @@ class Editarusuario extends StatefulWidget {
 class _EditarusuarioState extends State<Editarusuario> {
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _currentPasswordController = TextEditingController();
   
   bool _isLoading = false;
-  bool _showCurrentPassword = false;
   
   @override
   void initState() {
@@ -72,17 +69,6 @@ class _EditarusuarioState extends State<Editarusuario> {
       return;
     }
     
-    // Si quiere cambiar la contraseña pero no proporciona la actual
-    if (_passwordController.text.isNotEmpty && _currentPasswordController.text.isEmpty) {
-      setState(() {
-        _showCurrentPassword = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Introduce tu contraseña actual para confirmar cambios')),
-      );
-      return;
-    }
-    
     setState(() {
       _isLoading = true;
     });
@@ -94,7 +80,7 @@ class _EditarusuarioState extends State<Editarusuario> {
         throw Exception("No hay usuario autenticado");
       }
       
-      // 1. Primero actualizar Firestore (operación menos sensible)
+      // 1. Actualizar Firestore
       await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(currentUser.uid)
@@ -105,18 +91,6 @@ class _EditarusuarioState extends State<Editarusuario> {
       // 2. Actualizar nombre de usuario en Auth
       await currentUser.updateDisplayName(_nombreController.text);
       
-      // 3. Si hay cambio de contraseña, reautenticar y cambiarla
-      if (_passwordController.text.isNotEmpty && _passwordController.text.length >= 6) {
-        // Reautenticar usuario con su contraseña actual
-        final credential = EmailAuthProvider.credential(
-          email: currentUser.email!, 
-          password: _currentPasswordController.text
-        );
-        
-        await currentUser.reauthenticateWithCredential(credential);
-        await currentUser.updatePassword(_passwordController.text);
-      }
-      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('¡Datos actualizados correctamente!')),
       );
@@ -125,21 +99,9 @@ class _EditarusuarioState extends State<Editarusuario> {
     } catch (e) {
       String errorMsg = 'Error al actualizar datos';
       
-      // Mensajes de error más específicos
+      // Mensajes de error simplificados (ya que no hay cambio de contraseña)
       if (e is FirebaseAuthException) {
-        switch (e.code) {
-          case 'wrong-password':
-            errorMsg = 'La contraseña actual es incorrecta';
-            break;
-          case 'requires-recent-login':
-            errorMsg = 'Por seguridad, inicia sesión nuevamente y vuelve a intentarlo';
-            break;
-          case 'weak-password':
-            errorMsg = 'La contraseña debe tener al menos 6 caracteres';
-            break;
-          default:
-            errorMsg = 'Error de autenticación: ${e.message}';
-        }
+        errorMsg = 'Error de autenticación: ${e.message}';
       }
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -265,60 +227,38 @@ class _EditarusuarioState extends State<Editarusuario> {
                                 ),
                                 const SizedBox(height: 15),
                                 
-                                // Campo para nueva contraseña
-                                TextField(
-                                  controller: _passwordController,
-                                  obscureText: true,
-                                  decoration: InputDecoration(
-                                    labelText: 'Nueva contraseña (opcional)',
-                                    labelStyle: const TextStyle(color: Colors.black),
-                                    prefixIcon: const Icon(
-                                      Icons.lock,
-                                      color: Colors.black,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.black.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    helperText: 'Mínimo 6 caracteres',
-                                  ),
-                                  onChanged: (value) {
-                                    // Mostrar campo de contraseña actual si comienza a escribir
-                                    if (value.isNotEmpty && !_showCurrentPassword) {
-                                      setState(() {
-                                        _showCurrentPassword = true;
-                                      });
+                                // Botón para restablecer contraseña por email
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    try {
+                                      final User? user = FirebaseAuth.instance.currentUser;
+                                      if (user != null) {
+                                        await FirebaseAuth.instance.sendPasswordResetEmail(
+                                          email: user.email!,
+                                        );
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Se ha enviado un enlace de restablecimiento a tu correo'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error al enviar el correo: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
                                     }
                                   },
-                                ),
-                                if (_showCurrentPassword) ...[
-                                  const SizedBox(height: 15),
-                                  // Campo para contraseña actual (requerido para cambios sensibles)
-                                  TextField(
-                                    controller: _currentPasswordController,
-                                    obscureText: true,
-                                    decoration: InputDecoration(
-                                      labelText: 'Contraseña actual',
-                                      labelStyle: const TextStyle(color: Colors.black),
-                                      prefixIcon: const Icon(
-                                        Icons.key,
-                                        color: Colors.black,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: Colors.black.withOpacity(0.3),
-                                        ),
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                    ),
+                                  icon: const Icon(Icons.lock_reset, color: Colors.blue),
+                                  label: const Text(
+                                    'Restablecer contraseña por correo',
+                                    style: TextStyle(color: Colors.blue),
                                   ),
-                                ],
+                                ),
+                                
                                 const SizedBox(height: 20),
                                 
                                 // Botón de guardar cambios
@@ -357,8 +297,6 @@ class _EditarusuarioState extends State<Editarusuario> {
   void dispose() {
     _nombreController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _currentPasswordController.dispose();
     super.dispose();
   }
 }

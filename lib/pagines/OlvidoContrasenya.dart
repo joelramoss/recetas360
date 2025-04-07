@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart'; // Import de la página de login
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// OLA INFERIOR #1 (fondo rosa)
 class PinkWaveClipper extends CustomClipper<Path> {
@@ -154,19 +155,44 @@ class _OlvidoContrasenyaState extends State<OlvidoContrasenya> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (emailNotEmpty) {
-                      // Lógica para enviar el enlace de recuperación
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content:
-                              Text("Se ha enviado un enlace de recuperación a tu correo."),
-                        ),
-                      );
+                      try {
+                        await FirebaseAuth.instance.sendPasswordResetEmail(
+                          email: emailController.text.trim(),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Se ha enviado un enlace de recuperación a tu correo."),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        // Opcional: redirigir al usuario a la página de login después de unos segundos
+                        Future.delayed(const Duration(seconds: 3), () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const Paginalogin()),
+                          );
+                        });
+                      } on FirebaseAuthException catch (e) {
+                        String mensajeError = "Error al enviar el correo de recuperación";
+                        if (e.code == 'user-not-found') {
+                          mensajeError = "No existe una cuenta con ese correo electrónico";
+                        } else if (e.code == 'invalid-email') {
+                          mensajeError = "El formato del correo electrónico no es válido";
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(mensajeError),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text("Por favor, ingresa tu correo."),
+                          backgroundColor: Colors.red,
                         ),
                       );
                     }
