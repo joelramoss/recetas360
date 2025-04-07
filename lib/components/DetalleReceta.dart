@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/components/Receta.dart';
-import 'package:recetas360/components/nutritionalifno.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:recetas360/serveis/UsuarioUtil.dart';
+
 
 class DetalleReceta extends StatefulWidget {
   final Receta receta;
@@ -16,7 +16,7 @@ class DetalleReceta extends StatefulWidget {
 class _DetalleRecetaState extends State<DetalleReceta> {
   final TextEditingController _comentarioController = TextEditingController();
   late CollectionReference _comentariosRef;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UsuarioUtil _usuarioUtil = UsuarioUtil(); // Instancia de UsuarioUtil
 
   @override
   void initState() {
@@ -28,42 +28,45 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     return '${fecha.day}/${fecha.month}/${fecha.year} ${fecha.hour}:${fecha.minute.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _agregarComentario(String comentario) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Debes iniciar sesión para comentar')),
-        );
-        return;
-      }
+Future<void> _agregarComentario(String comentario) async {
+  try {
+    String? idUsuarioActual = UsuarioUtil().getUidUsuarioActual();
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(idUsuarioActual)
+        .get();
+    String nombreUsuario = userDoc.get('nombre') ?? 'Usuario desconocido';
 
-      await _comentariosRef.add({
-        'recetaId': widget.receta.id,
-        'comentario': comentario,
-        'usuarioId': user.uid,
-        'usuarioEmail': user.email,
-        'usuarioNombre': user.displayName ?? user.email!.split('@')[0],
-        'fecha': FieldValue.serverTimestamp(),
-      });
-      _comentarioController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comentario agregado')),
-      );
-    } catch (e) {
-      print('Error al agregar comentario: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al agregar comentario: ${e.toString()}')),
-      );
-    }
+    await FirebaseFirestore.instance
+        .collection('recetas')
+        .doc(widget.receta.id)
+        .collection('comentarios')
+        .add({
+      'comentario': comentario,
+      'usuarioId': idUsuarioActual,
+      'usuarioNombre': nombreUsuario,
+      'fecha': FieldValue.serverTimestamp(),
+    });
+    _comentarioController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Comentario agregado')),
+    );
+  } catch (e) {
+    print('Error al agregar comentario: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al agregar comentario: ${e.toString()}')),
+    );
   }
+}
 
-  Stream<QuerySnapshot> _cargarComentarios() {
-    return _comentariosRef
-        .where('recetaId', isEqualTo: widget.receta.id)
-        .orderBy('fecha', descending: true)
-        .snapshots();
-  }
+Stream<QuerySnapshot> _cargarComentarios() {
+  return FirebaseFirestore.instance
+      .collection('recetas')
+      .doc(widget.receta.id)
+      .collection('comentarios')
+      .orderBy('fecha', descending: true)
+      .snapshots();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -96,9 +99,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 },
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Información básica
             Row(
               children: [
@@ -107,9 +110,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 Text("${widget.receta.tiempoMinutos} min"),
               ],
             ),
-            
+
             const Divider(height: 32),
-            
+
             // Ingredientes
             const Text(
               "Ingredientes:",
@@ -127,9 +130,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 child: Text(ing),
               );
             }).toList(),
-            
+
             const Divider(height: 32),
-            
+
             // Descripción
             const Text(
               "Descripción:",
@@ -137,23 +140,23 @@ class _DetalleRecetaState extends State<DetalleReceta> {
             ),
             const SizedBox(height: 8),
             Text(widget.receta.descripcion),
-            
+
             const Divider(height: 32),
-            
+
             // SECCIÓN DE COMENTARIOS MEJORADA
             const Text(
               "Comentarios:",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            
+
             StreamBuilder<QuerySnapshot>(
               stream: _cargarComentarios(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 if (snapshot.hasError) {
                   return Text(
                     'Error: ${snapshot.error.toString()}',
@@ -162,7 +165,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 }
 
                 final comentarios = snapshot.data!.docs;
-                
+
                 if (comentarios.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
@@ -176,11 +179,12 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 return Column(
                   children: comentarios.map((doc) {
                     final comentario = doc.data() as Map<String, dynamic>;
-                    final fecha = comentario['fecha'] != null 
-                        ? (comentario['fecha'] as Timestamp).toDate() 
+                    final fecha = comentario['fecha'] != null
+                        ? (comentario['fecha'] as Timestamp).toDate()
                         : DateTime.now();
-                    final esUsuarioActual = comentario['usuarioId'] == _auth.currentUser?.uid;
-                    
+                    final esUsuarioActual =
+                        comentario['usuarioId'] == _usuarioUtil.getUidUsuarioActual();
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       color: esUsuarioActual ? Colors.orange[50] : null,
@@ -195,42 +199,41 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                                   radius: 14,
                                   backgroundColor: Colors.orangeAccent,
                                   child: Text(
-                                    comentario['usuarioNombre'][0].toUpperCase(),
+                                    (comentario['usuarioNombre'] != null && comentario['usuarioNombre'].isNotEmpty)
+                                        ? comentario['usuarioNombre'][0].toUpperCase()
+                                        : 'U',
                                     style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold
-                                    ),
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  comentario['usuarioNombre'],
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  comentario['usuarioNombre'] ?? 'Usuario desconocido',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
                                 ),
                                 if (esUsuarioActual) ...[
                                   const SizedBox(width: 8),
                                   const Text(
                                     '(Tú)',
                                     style: TextStyle(
-                                      color: Colors.orangeAccent,
-                                      fontStyle: FontStyle.italic
-                                    ),
+                                        color: Colors.orangeAccent,
+                                        fontStyle: FontStyle.italic),
                                   ),
                                 ],
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text(comentario['comentario']),
+                            Text(comentario['comentario'] ?? 'Sin comentario'),
                             const SizedBox(height: 8),
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
                                 _formatearFecha(fecha),
                                 style: const TextStyle(
-                                  fontSize: 12, 
-                                  color: Colors.grey
-                                ),
+                                    fontSize: 12, color: Colors.grey),
                               ),
                             ),
                           ],
@@ -241,9 +244,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 );
               },
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Formulario para nuevo comentario
             const Text(
               "Añadir comentario:",
@@ -267,7 +270,8 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                   _agregarComentario(comentarioTexto);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('El comentario no puede estar vacío')),
+                    const SnackBar(
+                        content: Text('El comentario no puede estar vacío')),
                   );
                 }
               },
