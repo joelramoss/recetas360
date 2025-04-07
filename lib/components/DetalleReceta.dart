@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/serveis/UsuarioUtil.dart';
+import 'Receta.dart';
+import 'nutritionalifno.dart';
+import 'package:recetas360/components/PasosRecetaScreen.dart';
 
 
 class DetalleReceta extends StatefulWidget {
@@ -237,6 +240,20 @@ Stream<QuerySnapshot> _cargarComentarios() {
                               ),
                             ),
                           ],
+                            onPressed: () {
+                              // Mantener solo la navegación a la pantalla de pasos
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PasosRecetaScreen(receta: receta),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "Iniciar",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         ),
                       ),
                     );
