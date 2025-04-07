@@ -2,7 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
-import 'package:recetas360/pagines/RecetasFavoritas.dart'; // Importa la página RecetasFavoritas
+import 'package:recetas360/pagines/HistorialRecetas.dart';
+import 'package:recetas360/pagines/RecetasFavoritas.dart';
 import '../widgetsutilizados/burbujaestilo.dart';
 
 class Pantallaprincipal extends StatefulWidget {
@@ -21,7 +22,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     "Verduras": "https://firebasestorage.googleapis.com/v0/b/...verduras.jpg",
     "Lácteos": "https://firebasestorage.googleapis.com/v0/b/...lacteos.jpg",
     "Cereales": "https://firebasestorage.googleapis.com/v0/b/...cereales.jpg",
-    "Favoritos": "https://firebasestorage.googleapis.com/v0/b/...favoritos.jpg", // Nueva categoría de Favoritos
   };
 
   late AnimationController _controller;
@@ -40,9 +40,11 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
 
   void _initializeAnimations() {
     final int n = tiposAlimento.length;
+    final double intervalLength = 1.0 / n;
+
     _bubbleAnimations = List.generate(n, (i) {
-      double start = i * 0.2;
-      double end = start + 0.2;
+      double start = i * intervalLength;
+      double end = start + intervalLength;
       return Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _controller,
@@ -71,7 +73,35 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         backgroundColor: Colors.orangeAccent,
         actions: [
           IconButton(
-            iconSize: 46,
+            icon: const Icon(Icons.favorite, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RecetasFavoritas(),
+                ),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialRecetas(),
+                ),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
+          IconButton(
+            iconSize: 32,
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               Navigator.push(
@@ -79,7 +109,9 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 MaterialPageRoute(
                   builder: (_) => const PaginaAjustes(),
                 ),
-              );
+              ).then((_) {
+                _restartAnimation();
+              });
             },
           ),
         ],
@@ -198,26 +230,14 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
             text: tipo,
             size: bubbleSize,
             onTap: () {
-              // Agrega una condición para navegar a la página RecetasFavoritas
-              if (tipo == "Favoritos") {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const RecetasFavoritas(), // Nueva página
-                  ),
-                ).then((_) {
-                  _restartAnimation();
-                });
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PantallaGastronomias(tipoAlimento: tipo),
-                  ),
-                ).then((_) {
-                  _restartAnimation();
-                });
-              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PantallaGastronomias(tipoAlimento: tipo),
+                ),
+              ).then((_) {
+                _restartAnimation();
+              });
             },
           ),
         ),
