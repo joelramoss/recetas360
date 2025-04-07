@@ -6,7 +6,6 @@ import 'Receta.dart';
 import 'nutritionalifno.dart';
 import 'package:recetas360/components/PasosRecetaScreen.dart';
 
-
 class DetalleReceta extends StatefulWidget {
   final Receta receta;
 
@@ -31,45 +30,45 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     return '${fecha.day}/${fecha.month}/${fecha.year} ${fecha.hour}:${fecha.minute.toString().padLeft(2, '0')}';
   }
 
-Future<void> _agregarComentario(String comentario) async {
-  try {
-    String? idUsuarioActual = UsuarioUtil().getUidUsuarioActual();
-    DocumentSnapshot userDoc = await FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(idUsuarioActual)
-        .get();
-    String nombreUsuario = userDoc.get('nombre') ?? 'Usuario desconocido';
+  Future<void> _agregarComentario(String comentario) async {
+    try {
+      String? idUsuarioActual = UsuarioUtil().getUidUsuarioActual();
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(idUsuarioActual)
+          .get();
+      String nombreUsuario = userDoc.get('nombre') ?? 'Usuario desconocido';
 
-    await FirebaseFirestore.instance
+      await FirebaseFirestore.instance
+          .collection('recetas')
+          .doc(widget.receta.id)
+          .collection('comentarios')
+          .add({
+        'comentario': comentario,
+        'usuarioId': idUsuarioActual,
+        'usuarioNombre': nombreUsuario,
+        'fecha': FieldValue.serverTimestamp(),
+      });
+      _comentarioController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Comentario agregado')),
+      );
+    } catch (e) {
+      print('Error al agregar comentario: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar comentario: ${e.toString()}')),
+      );
+    }
+  }
+
+  Stream<QuerySnapshot> _cargarComentarios() {
+    return FirebaseFirestore.instance
         .collection('recetas')
         .doc(widget.receta.id)
         .collection('comentarios')
-        .add({
-      'comentario': comentario,
-      'usuarioId': idUsuarioActual,
-      'usuarioNombre': nombreUsuario,
-      'fecha': FieldValue.serverTimestamp(),
-    });
-    _comentarioController.clear();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Comentario agregado')),
-    );
-  } catch (e) {
-    print('Error al agregar comentario: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error al agregar comentario: ${e.toString()}')),
-    );
+        .orderBy('fecha', descending: true)
+        .snapshots();
   }
-}
-
-Stream<QuerySnapshot> _cargarComentarios() {
-  return FirebaseFirestore.instance
-      .collection('recetas')
-      .doc(widget.receta.id)
-      .collection('comentarios')
-      .orderBy('fecha', descending: true)
-      .snapshots();
-}
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +142,28 @@ Stream<QuerySnapshot> _cargarComentarios() {
             ),
             const SizedBox(height: 8),
             Text(widget.receta.descripcion),
+
+            const SizedBox(height: 24),
+            
+            // Botón Iniciar (colocado antes de los comentarios)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PasosRecetaScreen(receta: widget.receta),
+                  ),
+                );
+              },
+              child: const Text(
+                "Iniciar",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
 
             const Divider(height: 32),
 
@@ -240,20 +261,6 @@ Stream<QuerySnapshot> _cargarComentarios() {
                               ),
                             ),
                           ],
-                            onPressed: () {
-                              // Mantener solo la navegación a la pantalla de pasos
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PasosRecetaScreen(receta: receta),
-                                ),
-                              );
-                            },
-                            child: const Text(
-                              "Iniciar",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ),
                         ),
                       ),
                     );
