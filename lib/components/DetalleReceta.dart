@@ -1,205 +1,309 @@
 import 'package:flutter/material.dart';
+import 'package:recetas360/components/Receta.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:recetas360/serveis/UsuarioUtil.dart';
 import 'Receta.dart';
 import 'nutritionalifno.dart';
+import 'package:recetas360/components/PasosRecetaScreen.dart';
 
-class DetalleReceta extends StatelessWidget {
+class DetalleReceta extends StatefulWidget {
   final Receta receta;
 
   const DetalleReceta({Key? key, required this.receta}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final NutritionalInfo info = receta.nutritionalInfo != null
-        ? NutritionalInfo.fromMap(receta.nutritionalInfo!)
-        : NutritionalInfo(
-            energy: 0,
-            proteins: 0,
-            carbs: 0,
-            fats: 0,
-            saturatedFats: 0,
-          );
+  _DetalleRecetaState createState() => _DetalleRecetaState();
+}
 
+class _DetalleRecetaState extends State<DetalleReceta> {
+  final TextEditingController _comentarioController = TextEditingController();
+  late CollectionReference _comentariosRef;
+  final UsuarioUtil _usuarioUtil = UsuarioUtil(); // Instancia de UsuarioUtil
+
+  @override
+  void initState() {
+    super.initState();
+    _comentariosRef = FirebaseFirestore.instance.collection('comentarios');
+  }
+
+  String _formatearFecha(DateTime fecha) {
+    return '${fecha.day}/${fecha.month}/${fecha.year} ${fecha.hour}:${fecha.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _agregarComentario(String comentario) async {
+    try {
+      String? idUsuarioActual = UsuarioUtil().getUidUsuarioActual();
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(idUsuarioActual)
+          .get();
+      String nombreUsuario = userDoc.get('nombre') ?? 'Usuario desconocido';
+
+      await FirebaseFirestore.instance
+          .collection('recetas')
+          .doc(widget.receta.id)
+          .collection('comentarios')
+          .add({
+        'comentario': comentario,
+        'usuarioId': idUsuarioActual,
+        'usuarioNombre': nombreUsuario,
+        'fecha': FieldValue.serverTimestamp(),
+      });
+      _comentarioController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Comentario agregado')),
+      );
+    } catch (e) {
+      print('Error al agregar comentario: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar comentario: ${e.toString()}')),
+      );
+    }
+  }
+
+  Stream<QuerySnapshot> _cargarComentarios() {
+    return FirebaseFirestore.instance
+        .collection('recetas')
+        .doc(widget.receta.id)
+        .collection('comentarios')
+        .orderBy('fecha', descending: true)
+        .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: Text(widget.receta.nombre),
         backgroundColor: Colors.orangeAccent,
-        actions: [
-          IconButton(
-            iconSize: 32.0,
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              // Acción para abrir ajustes
-              // Navigator.push(...);
-            },
-          ),
-        ],
       ),
-      body: Container(
-        // Mismo fondo degradado que en ListaRecetas
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.orangeAccent,
-              Colors.pink.shade100,
-            ],
-          ),
-        ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Encabezado con 50 px de alto, igual que en ListaRecetas
-            Container(
-              width: double.infinity,
-              height: 50,
-              child: Center(
-                child: Text(
-                  "Detalle de la Receta",
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black45,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+            // Imagen de la receta
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                widget.receta.urlImagen,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 200,
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported, size: 50),
+                    ),
+                  );
+                },
               ),
             ),
-            // El resto del contenido en un Expanded con SingleChildScrollView
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  elevation: 6,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+
+            const SizedBox(height: 16),
+
+            // Información básica
+            Row(
+              children: [
+                const Icon(Icons.timer, color: Colors.orangeAccent),
+                const SizedBox(width: 8),
+                Text("${widget.receta.tiempoMinutos} min"),
+              ],
+            ),
+
+            const Divider(height: 32),
+
+            // Ingredientes
+            const Text(
+              "Ingredientes:",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...widget.receta.ingredientes.map((ing) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(ing),
+              );
+            }).toList(),
+
+            const Divider(height: 32),
+
+            // Descripción
+            const Text(
+              "Descripción:",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(widget.receta.descripcion),
+
+            const SizedBox(height: 24),
+            
+            // Botón Iniciar (colocado antes de los comentarios)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PasosRecetaScreen(receta: widget.receta),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Imagen de la receta
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            receta.urlImagen,
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                color: Colors.grey.shade300,
-                                child: const Center(
-                                  child: Icon(Icons.image_not_supported, size: 50),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Título de la receta
-                        Text(
-                          receta.nombre,
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        // Tiempo de preparación
-                        Row(
+                );
+              },
+              child: const Text(
+                "Iniciar",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+
+            const Divider(height: 32),
+
+            // SECCIÓN DE COMENTARIOS MEJORADA
+            const Text(
+              "Comentarios:",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+
+            StreamBuilder<QuerySnapshot>(
+              stream: _cargarComentarios(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Text(
+                    'Error: ${snapshot.error.toString()}',
+                    style: const TextStyle(color: Colors.red),
+                  );
+                }
+
+                final comentarios = snapshot.data!.docs;
+
+                if (comentarios.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'No hay comentarios aún. ¡Sé el primero en comentar!',
+                      style: TextStyle(fontStyle: FontStyle.italic),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: comentarios.map((doc) {
+                    final comentario = doc.data() as Map<String, dynamic>;
+                    final fecha = comentario['fecha'] != null
+                        ? (comentario['fecha'] as Timestamp).toDate()
+                        : DateTime.now();
+                    final esUsuarioActual =
+                        comentario['usuarioId'] == _usuarioUtil.getUidUsuarioActual();
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      color: esUsuarioActual ? Colors.orange[50] : null,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.timer, color: Colors.orangeAccent),
-                            const SizedBox(width: 8),
-                            Text("${receta.tiempoMinutos} min",
-                                style: const TextStyle(fontSize: 16)),
-                          ],
-                        ),
-                        const Divider(height: 32, thickness: 1),
-                        // Lista de ingredientes
-                        const Text(
-                          "Ingredientes:",
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        ...receta.ingredientes.map((ing) {
-                          return Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              border: Border.all(color: Colors.orangeAccent, width: 1),
-                              borderRadius: BorderRadius.circular(8),
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: Colors.orangeAccent,
+                                  child: Text(
+                                    (comentario['usuarioNombre'] != null && comentario['usuarioNombre'].isNotEmpty)
+                                        ? comentario['usuarioNombre'][0].toUpperCase()
+                                        : 'U',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  comentario['usuarioNombre'] ?? 'Usuario desconocido',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                if (esUsuarioActual) ...[
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    '(Tú)',
+                                    style: TextStyle(
+                                        color: Colors.orangeAccent,
+                                        fontStyle: FontStyle.italic),
+                                  ),
+                                ],
+                              ],
                             ),
-                            child: Text(ing, style: const TextStyle(fontSize: 16)),
-                          );
-                        }).toList(),
-                        const Divider(height: 32, thickness: 1),
-                        // Descripción
-                        const Text(
-                          "Descripción:",
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          receta.descripcion,
-                          style: const TextStyle(fontSize: 16),
-                          textAlign: TextAlign.justify,
-                        ),
-                        const Divider(height: 32, thickness: 1),
-                        // Tabla nutricional
-                        const Text(
-                          "Tabla Nutricional (aproximada) 100g / 100ml:",
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        Text("Valor Energético: ${info.energy.toStringAsFixed(2)} kcal"),
-                        Text("Proteínas: ${info.proteins.toStringAsFixed(2)} g"),
-                        Text("Carbohidratos: ${info.carbs.toStringAsFixed(2)} g"),
-                        Text("Grasas: ${info.fats.toStringAsFixed(2)} g"),
-                        Text("Grasas Saturadas: ${info.saturatedFats.toStringAsFixed(2)} g"),
-                        const Divider(height: 32, thickness: 1),
-                        // Categoría y gastronomía
-                        Text(
-                          "Categoría: ${receta.categoria}",
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "Gastronomía: ${receta.gastronomia}",
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 32),
-                        // Botón "Iniciar"
-                        Center(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orangeAccent,
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
+                            const SizedBox(height: 8),
+                            Text(comentario['comentario'] ?? 'Sin comentario'),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                _formatearFecha(fecha),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                               ),
                             ),
-                            onPressed: () {
-                              // Acción para iniciar la receta
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Receta iniciada")),
-                              );
-                            },
-                            child: const Text(
-                              "Iniciar",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // Formulario para nuevo comentario
+            const Text(
+              "Añadir comentario:",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _comentarioController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: "Escribe tu comentario aquí...",
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.all(12),
               ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () {
+                final comentarioTexto = _comentarioController.text.trim();
+                if (comentarioTexto.isNotEmpty) {
+                  _agregarComentario(comentarioTexto);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('El comentario no puede estar vacío')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text("Publicar Comentario"),
             ),
           ],
         ),

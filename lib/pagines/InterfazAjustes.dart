@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/Ajustes/EditarUsuario.dart';
-import 'package:recetas360/pagines/Ajustes/Lenguajes.dart';
-import 'package:recetas360/pagines/Ajustes/Notificaciones.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';
 
 class PaginaAjustes extends StatelessWidget {
@@ -10,6 +8,22 @@ class PaginaAjustes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Añadir AppBar con botón de retroceso
+      appBar: AppBar(
+        backgroundColor: Colors.orangeAccent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          "Ajustes",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       // Fondo degradado para toda la pantalla
       body: Container(
         decoration: BoxDecoration(
@@ -25,27 +39,6 @@ class PaginaAjustes extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Encabezado de 50 px con texto centrado
-              Container(
-                width: double.infinity,
-                height: 50,
-                alignment: Alignment.center,
-                child: const Text(
-                  "Ajustes",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black45,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
               // Contenedor central con Card para el contenido de ajustes
               Expanded(
                 child: Center(
@@ -88,47 +81,8 @@ class PaginaAjustes extends StatelessWidget {
                             },
                           ),
                           const Divider(color: Colors.black26),
-                          // Opción: Notificaciones
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.notifications, color: Colors.black),
-                            title: const Text(
-                              'Notificaciones',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const PaginaNotificaciones(),
-                                ),
-                              );
-                            },
-                          ),
-                          const Divider(color: Colors.black26),
-                          // Opción: Lenguaje
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.language, color: Colors.black),
-                            title: const Text(
-                              'Lenguaje',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const Lenguajes(),
-                                ),
-                              );
-                            },
-                          ),
+                          // Se eliminaron las opciones de Notificaciones y Lenguaje
+                          
                           const SizedBox(height: 20),
                           // Botón "Salir"
                           ElevatedButton(
