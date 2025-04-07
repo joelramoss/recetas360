@@ -112,7 +112,7 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
         ),
         IconButton(
           icon: const Icon(Icons.search),
-          onPressed: () async {
+          onPressed: () {
             if (ing.name.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -121,14 +121,16 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
               );
               return;
             }
-            // Seleccionar un producto (si usas la lógica de tu proyecto)
-            Producto? producto = await showProductoSelection(context, ing.name);
-            if (producto != null) {
-              setState(() {
-                ing.selected = producto;
-              });
-              _recalcularMacros();
-            }
+            
+            // Usar un contexto capturado en el momento del clic
+            showProductoSelection(context, ing.name).then((producto) {
+              if (producto != null && mounted) {
+                setState(() {
+                  ing.selected = producto;
+                });
+                _recalcularMacros();
+              }
+            });
           },
         ),
         if (ing.selected != null) const Icon(Icons.check, color: Colors.green),
