@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
@@ -5,6 +6,7 @@ import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/editarReceta.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallacrearReceta.dart';
+import 'package:recetas360/pagines/HistorialRecetas.dart';
 
 class ListaRecetas extends StatefulWidget {
   final String mainCategory;
@@ -36,6 +38,19 @@ class _ListaRecetasState extends State<ListaRecetas> {
       appBar: AppBar(
         backgroundColor: Colors.orangeAccent,
         actions: [
+          // Agregar botón de historial
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialRecetas(),
+                ),
+              );
+            },
+          ),
           IconButton(
             iconSize: 32.0,
             icon: const Icon(Icons.settings, color: Colors.white),
@@ -247,12 +262,29 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                           _favorites[receta.id] = newValue;
                                         });
                                         try {
-                                          await FirebaseFirestore.instance
-                                              .collection('recetas')
-                                              .doc(receta.id)
-                                              .update({'isFavorite': newValue});
+                                          final userId = FirebaseAuth.instance.currentUser?.uid; // Obtén el ID del usuario actual
+
+                                          if (userId != null) {
+                                            if (newValue) {
+                                              // Si el usuario marca como favorito, añadimos a la colección de favoritos
+                                              await FirebaseFirestore.instance
+                                                  .collection('usuarios')
+                                                  .doc(userId)
+                                                  .collection('favoritos')
+                                                  .doc(receta.id)
+                                                  .set({'recetaId': receta.id});
+                                            } else {
+                                              // Si el usuario desmarca como favorito, eliminamos de la colección de favoritos
+                                              await FirebaseFirestore.instance
+                                                  .collection('usuarios')
+                                                  .doc(userId)
+                                                  .collection('favoritos')
+                                                  .doc(receta.id)
+                                                  .delete();
+                                            }
+                                          }
                                         } catch (e) {
-                                          // Si falla, revertir el cambio
+                                          // Si algo sale mal, revertimos el estado de los favoritos
                                           setState(() {
                                             _favorites[receta.id] = isFavorite;
                                           });

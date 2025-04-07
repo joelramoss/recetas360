@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:recetas360/components/ListaRecetas.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
+import 'package:recetas360/pagines/HistorialRecetas.dart';
 import '../widgetsutilizados/burbujaestilo.dart';
 
 class PantallaGastronomias extends StatefulWidget {
@@ -63,6 +64,20 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
       appBar: AppBar(
         backgroundColor: Colors.orangeAccent,
         actions: [
+          // Añadir botón de historial
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialRecetas(),
+                ),
+              );
+            },
+          ),
+          // Botón de configuración existente
           IconButton(
             iconSize: 32.0,
             icon: const Icon(Icons.settings, color: Colors.white),

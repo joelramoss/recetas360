@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
+import 'package:recetas360/pagines/HistorialRecetas.dart';
+import 'package:recetas360/pagines/RecetasFavoritas.dart';
 import '../widgetsutilizados/burbujaestilo.dart';
 
 class Pantallaprincipal extends StatefulWidget {
@@ -14,7 +16,6 @@ class Pantallaprincipal extends StatefulWidget {
 class _PantallaBurbujasState extends State<Pantallaprincipal>
     with SingleTickerProviderStateMixin {
   // Mapa de categorías: nombre y URL de imagen
-  // Aunque tengamos las URLs, no las mostraremos en pantalla
   final Map<String, String> tiposAlimento = {
     "Carne": "https://firebasestorage.googleapis.com/v0/b/...carne.jpg",
     "Pescado": "https://firebasestorage.googleapis.com/v0/b/...pescado.jpg",
@@ -39,9 +40,11 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
 
   void _initializeAnimations() {
     final int n = tiposAlimento.length;
+    final double intervalLength = 1.0 / n;
+
     _bubbleAnimations = List.generate(n, (i) {
-      double start = i * 0.2;
-      double end = start + 0.2;
+      double start = i * intervalLength;
+      double end = start + intervalLength;
       return Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _controller,
@@ -70,7 +73,35 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         backgroundColor: Colors.orangeAccent,
         actions: [
           IconButton(
-            iconSize: 46,
+            icon: const Icon(Icons.favorite, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RecetasFavoritas(),
+                ),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialRecetas(),
+                ),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
+          IconButton(
+            iconSize: 32,
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               Navigator.push(
@@ -78,13 +109,14 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 MaterialPageRoute(
                   builder: (_) => const PaginaAjustes(),
                 ),
-              );
+              ).then((_) {
+                _restartAnimation();
+              });
             },
           ),
         ],
       ),
       body: Container(
-        // Fondo degradado
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -97,7 +129,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
         ),
         child: Column(
           children: [
-            // Encabezado con texto centrado
             Container(
               width: double.infinity,
               height: 50,
@@ -119,7 +150,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 ),
               ),
             ),
-            // Espacio flexible para las burbujas
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -129,23 +159,18 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                   final double centerY = boxHeight / 2;
                   final double minSide = math.min(boxWidth, boxHeight);
 
-                  // Radio para posicionar las burbujas alrededor de la central
                   final double radius = minSide * 0.30;
-                  // Tamaño de las burbujas exteriores
                   final double outerBubbleSize = minSide * 0.28;
-                  // Tamaño de la burbuja central
                   final double centerBubbleSize = minSide * 0.25;
 
                   return Stack(
                     children: [
-                      // Burbujas animadas alrededor
                       ..._buildBurbujas(
                         centerX: centerX,
                         centerY: centerY,
                         radius: radius,
                         bubbleSize: outerBubbleSize,
                       ),
-                      // Burbuja central
                       Positioned(
                         left: centerX - (centerBubbleSize / 2),
                         top: centerY - (centerBubbleSize / 2),
@@ -178,8 +203,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
 
     for (int i = 0; i < n; i++) {
       final String tipo = entries[i].key;
-      final String url = entries[i].value; // URL que no usamos ahora
-      // Distribuimos las burbujas en un círculo
+      final String url = entries[i].value;
       final double angle = -math.pi / 2 + (2 * math.pi * i) / n;
 
       bubbles.add(
@@ -202,7 +226,6 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
               ),
             );
           },
-          // Pasamos sólo el texto a Burbujawidget, ignorando la URL
           child: Burbujawidget(
             text: tipo,
             size: bubbleSize,
