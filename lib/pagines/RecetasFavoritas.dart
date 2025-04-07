@@ -19,45 +19,25 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
   @override
   void initState() {
     super.initState();
-    _loadUserIdAndFavorites();
+    _loadUserId();
   }
 
-  // Cargar el ID del usuario y sus favoritos
-  _loadUserIdAndFavorites() async {
+  // Cargar el ID del usuario
+  _loadUserId() async {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
       setState(() {
         _userId = user.uid; // Obtener el userId del usuario autenticado
       });
-      _loadUserFavorites(user.uid);
     } else {
-      // Si no hay usuario autenticado, manejar este caso (por ejemplo, mostrar mensaje de error)
+      // Si no hay usuario autenticado, manejar este caso
       setState(() {
         _userId = "";
       });
-    }
-  }
-
-  // Cargar los favoritos del usuario
-  _loadUserFavorites(String userId) async {
-    try {
-      final favoritesSnapshot = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userId)
-          .collection('favoritos')
-          .get();
-
-      final favorites = <String, bool>{};
-      for (var doc in favoritesSnapshot.docs) {
-        favorites[doc.id] = true; // Marcar como favorito
-      }
-
-      setState(() {
-        _favorites = favorites;
-      });
-    } catch (e) {
-      print("Error al cargar favoritos: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Debes iniciar sesión para ver tus recetas favoritas.")),
+      );
     }
   }
 
@@ -125,32 +105,31 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('recetas')
+                    .where('isFavorite', isEqualTo: true) // Filtramos directamente las recetas con isFavorite: true
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text("No se encontraron recetas."));
+                    return const Center(child: Text("No tienes recetas favoritas."));
                   }
                   final recetasDocs = snapshot.data!.docs;
                   final List<Receta> recetas = recetasDocs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     data['id'] = doc.id;
+                    // Inicializamos el estado de favoritos con el valor de isFavorite
+                    _favorites[doc.id] = data['isFavorite'] ?? false;
                     return Receta.fromFirestore(data);
-                  }).toList();
-
-                  // Filtrar solo las recetas favoritas
-                  final favoritas = recetas.where((receta) {
-                    return _favorites[receta.id] ?? false; // Verifica si la receta está marcada como favorita
                   }).toList();
 
                   return ListView.builder(
                     padding: EdgeInsets.all(cardPadding),
-                    itemCount: favoritas.length,
+                    itemCount: recetas.length,
                     itemBuilder: (context, index) {
-                      final receta = favoritas[index];
+                      final receta = recetas[index];
                       final recetaId = receta.id;
+                      final isFavorite = _favorites[recetaId] ?? false;
 
                       return GestureDetector(
                         onTap: () {
@@ -162,6 +141,7 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
                           );
                         },
                         child: Card(
+                          color: isFavorite ? Colors.pink.shade100 : Colors.white, // Fondo rosa para recetas favoritas
                           elevation: 4,
                           margin: EdgeInsets.only(bottom: cardPadding),
                           shape: RoundedRectangleBorder(
@@ -228,38 +208,43 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
                                   children: [
                                     IconButton(
                                       icon: Icon(
-                                        _favorites[recetaId] ?? false
-                                            ? Icons.favorite
-                                            : Icons.favorite_border,
-                                        color: _favorites[recetaId] ?? false
-                                            ? Colors.red
-                                            : Colors.grey,
+                                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                                        color: isFavorite ? Colors.red : Colors.grey,
                                       ),
                                       onPressed: () async {
-                                        final newValue = !(_favorites[recetaId] ?? false);
+                                        final newValue = !isFavorite;
                                         setState(() {
                                           _favorites[recetaId] = newValue;
                                         });
 
                                         try {
-                                          if (newValue) {
-                                            await FirebaseFirestore.instance
-                                                .collection('usuarios')
-                                                .doc(_userId)
-                                                .collection('favoritos')
-                                                .doc(recetaId)
-                                                .set({'recetaId': recetaId});
-                                          } else {
-                                            await FirebaseFirestore.instance
-                                                .collection('usuarios')
-                                                .doc(_userId)
-                                                .collection('favoritos')
-                                                .doc(recetaId)
-                                                .delete();
+                                          // Actualizamos el campo isFavorite en la colección recetas
+                                          await FirebaseFirestore.instance
+                                              .collection('recetas')
+                                              .doc(recetaId)
+                                              .update({'isFavorite': newValue});
+
+                                          // Actualizamos la colección de favoritos del usuario
+                                          if (_userId.isNotEmpty) {
+                                            if (newValue) {
+                                              await FirebaseFirestore.instance
+                                                  .collection('usuarios')
+                                                  .doc(_userId)
+                                                  .collection('favoritos')
+                                                  .doc(recetaId)
+                                                  .set({'recetaId': recetaId});
+                                            } else {
+                                              await FirebaseFirestore.instance
+                                                  .collection('usuarios')
+                                                  .doc(_userId)
+                                                  .collection('favoritos')
+                                                  .doc(recetaId)
+                                                  .delete();
+                                            }
                                           }
                                         } catch (e) {
                                           setState(() {
-                                            _favorites[recetaId] = !(newValue);
+                                            _favorites[recetaId] = !newValue;
                                           });
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(content: Text("Error al actualizar favorito: $e")),

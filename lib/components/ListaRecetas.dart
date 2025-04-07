@@ -122,7 +122,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                   final List<Receta> recetas = recetasDocs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     data['id'] = doc.id;
-                    // Si el campo 'isFavorite' no existe, se asume false.
+                    // Inicializamos el estado de favoritos con el valor de isFavorite
                     _favorites[doc.id] = data['isFavorite'] ?? false;
                     return Receta.fromFirestore(data);
                   }).toList();
@@ -170,6 +170,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                       }
 
                       final receta = recetas[index];
+                      // Usamos el valor de _favorites para determinar si es favorita
                       final isFavorite = _favorites[receta.id] ?? false;
 
                       // Construimos la tarjeta de cada receta con un layout personalizado
@@ -183,7 +184,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                           );
                         },
                         child: Card(
-                          color: isFavorite ? Colors.pink.shade100 : Colors.white,
+                          color: isFavorite ? Colors.pink.shade100 : Colors.white, // Cambia el color de fondo según el estado
                           elevation: 4,
                           margin: EdgeInsets.only(bottom: cardPadding),
                           shape: RoundedRectangleBorder(
@@ -262,27 +263,11 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                           _favorites[receta.id] = newValue;
                                         });
                                         try {
-                                          final userId = FirebaseAuth.instance.currentUser?.uid; // Obtén el ID del usuario actual
-
-                                          if (userId != null) {
-                                            if (newValue) {
-                                              // Si el usuario marca como favorito, añadimos a la colección de favoritos
-                                              await FirebaseFirestore.instance
-                                                  .collection('usuarios')
-                                                  .doc(userId)
-                                                  .collection('favoritos')
-                                                  .doc(receta.id)
-                                                  .set({'recetaId': receta.id});
-                                            } else {
-                                              // Si el usuario desmarca como favorito, eliminamos de la colección de favoritos
-                                              await FirebaseFirestore.instance
-                                                  .collection('usuarios')
-                                                  .doc(userId)
-                                                  .collection('favoritos')
-                                                  .doc(receta.id)
-                                                  .delete();
-                                            }
-                                          }
+                                          // Actualizamos el campo isFavorite directamente en la colección recetas
+                                          await FirebaseFirestore.instance
+                                              .collection('recetas')
+                                              .doc(receta.id)
+                                              .update({'isFavorite': newValue});
                                         } catch (e) {
                                           // Si algo sale mal, revertimos el estado de los favoritos
                                           setState(() {
