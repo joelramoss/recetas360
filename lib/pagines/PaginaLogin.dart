@@ -1,77 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:recetas360/pagines/OlvidoContrasenya.dart';
-import 'package:recetas360/pagines/PantallaPrincipal.dart';
-import 'package:recetas360/pagines/PaginaRegistro.dart';
+import 'package:recetas360/pagines/OlvidoContrasenya.dart'; // Corrected import name
+import 'package:recetas360/pagines/PantallaPrincipal.dart'; // Corrected import name
+import 'package:recetas360/pagines/PaginaRegistro.dart'; // Corrected import name
+import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 
-/// OLA INFERIOR #1 (fondo rosa)
-class PinkWaveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    // Empezamos desde la esquina inferior izquierda
-    path.moveTo(0, size.height);
-
-    // Primer arco (sube)
-    path.quadraticBezierTo(
-      size.width * 0.25,  // Punto de control X
-      size.height * 0.80, // Punto de control Y
-      size.width * 0.50,  // Destino X
-      size.height * 0.90, // Destino Y
-    );
-
-    // Segundo arco (baja)
-    path.quadraticBezierTo(
-      size.width * 0.75,
-      size.height,
-      size.width,
-      size.height * 0.70,
-    );
-
-    // Cierra hasta la esquina inferior derecha
-    path.lineTo(size.width, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(PinkWaveClipper oldClipper) => false;
-}
-
-/// OLA INFERIOR #2 (encima, morada)
-class PurpleWaveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    // Iniciamos un poco más arriba para superponer la ola rosa
-    path.moveTo(0, size.height * 0.95);
-
-    // Primer arco
-    path.quadraticBezierTo(
-      size.width * 0.25,
-      size.height * 0.75,
-      size.width * 0.50,
-      size.height * 0.85,
-    );
-
-    // Segundo arco
-    path.quadraticBezierTo(
-      size.width * 0.75,
-      size.height * 0.95,
-      size.width,
-      size.height * 0.60,
-    );
-
-    // Cierra hasta la esquina inferior derecha
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(PurpleWaveClipper oldClipper) => false;
-}
+// Current User's Login: joelramoss
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:41:09
 
 class Paginalogin extends StatefulWidget {
   const Paginalogin({Key? key}) : super(key: key);
@@ -81,20 +16,15 @@ class Paginalogin extends StatefulWidget {
 }
 
 class _PaginaloginState extends State<Paginalogin> {
-  bool rememberMe = false;
-
-  // Controladores para los campos de texto
+  // bool rememberMe = false; // Removed, not used
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  @override
-  void initState() {
-    super.initState();
-    emailController.addListener(_onTextFieldChange);
-    passwordController.addListener(_onTextFieldChange);
-  }
+  bool _isLoggingIn = false; // Flag for login progress
+  bool _obscurePassword = true; // Toggle password visibility
+
+  // Removed listeners as they only called setState without specific logic
 
   @override
   void dispose() {
@@ -103,303 +33,304 @@ class _PaginaloginState extends State<Paginalogin> {
     super.dispose();
   }
 
-  void _onTextFieldChange() {
-    setState(() {});
-  }
-
+  // Login Logic (with improved error handling and progress state)
   Future<void> _iniciarSesion() async {
+    if (_isLoggingIn) return; // Prevent multiple attempts
+
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Por favor, completa ambos campos.")),
+        SnackBar(
+          content: Text("Por favor, completa ambos campos.", style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          ),
       );
       return;
     }
 
+    setState(() => _isLoggingIn = true);
+
     try {
-      // Intentar iniciar sesión con Firebase Authentication
       await _auth.signInWithEmailAndPassword(email: email, password: password);
 
-      // Si el login es exitoso, ir a la pantalla principal
-      Navigator.pushReplacement(
+      if (!mounted) return; // Check if widget is still mounted
+
+      // Navigate to main screen on success, clearing the stack
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+        (route) => false, // Remove all previous routes
       );
+
     } on FirebaseAuthException catch (e) {
-      String mensajeError = "Error al iniciar sesión.";
-      if (e.code == 'user-not-found') {
-        mensajeError = "No existe una cuenta con este correo.";
-      } else if (e.code == 'wrong-password') {
-        mensajeError = "Contraseña incorrecta.";
+       if (!mounted) return; // Check again after async operation
+
+      String mensajeError = "Error desconocido al iniciar sesión.";
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential' ) { // invalid-credential covers wrong email/pass
+        mensajeError = "Correo o contraseña incorrectos.";
       } else if (e.code == 'invalid-email') {
-        mensajeError = "Correo inválido.";
+        mensajeError = "El formato del correo electrónico no es válido.";
+      } else if (e.code == 'user-disabled') {
+         mensajeError = "Esta cuenta ha sido deshabilitada.";
       }
+      print("FirebaseAuthException: ${e.code} - ${e.message}"); // Log detailed error
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(mensajeError)),
+        SnackBar(
+          content: Text(mensajeError, style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
+    } catch (e) { // Catch generic errors
+       if (!mounted) return;
+       print("Generic Error during login: $e");
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+           content: Text("Ocurrió un error inesperado.", style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+           backgroundColor: Theme.of(context).colorScheme.error,
+         ),
+       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoggingIn = false); // Reset flag
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool camposLlenos =
-        emailController.text.isNotEmpty && passwordController.text.isNotEmpty;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    final Color botonColor = camposLlenos
-        ? Colors.pink.shade300 // Más vivo si hay texto
-        : Colors.pink.shade100; // Rosa claro si están vacíos
+    // Removed dynamic button color based on camposLlenos, button state handled by onPressed
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 60),
-            // Título "Iniciar Sesión"
-            const Text(
-              "Iniciar Sesión",
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 30),
+      // Use theme background color - remove Container with gradient
+      body: SafeArea( // Ensure content doesn't overlap status bar/notches
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                 // --- App Logo (Optional) ---
+                // Icon(Icons.restaurant_menu, size: 60, color: colorScheme.primary),
+                // const SizedBox(height: 20),
 
-            // Campo "Ingresa tu correo electrónico"
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: 'Ingresa tu correo electrónico',
-                  labelStyle: const TextStyle(color: Colors.black87),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.purple, width: 2),
-                    borderRadius: BorderRadius.circular(30),
+                // --- Title ---
+                Text(
+                  "Iniciar Sesión",
+                  textAlign: TextAlign.center,
+                  style: textTheme.displaySmall?.copyWith( // Use display style
+                    color: colorScheme.primary, // Use primary color
+                    fontWeight: FontWeight.bold,
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                        color: Colors.purple.shade200, width: 1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+                ).animate().fadeIn(delay: 100.ms),
+                 const SizedBox(height: 8),
+                 Text(
+                  "Bienvenido de nuevo a Recetas 360",
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                ).animate().fadeIn(delay: 200.ms),
+                const SizedBox(height: 35),
 
-            // Campo "Contraseña"
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Contraseña',
-                  labelStyle: const TextStyle(color: Colors.black87),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.purple, width: 2),
-                    borderRadius: BorderRadius.circular(30),
+                // --- Form Fields ---
+                TextFormField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _inputDecoration(
+                    context: context,
+                    label: 'Correo electrónico',
+                    icon: Icons.email_outlined,
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                        color: Colors.purple.shade200, width: 1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
+                   validator: (value) { // Add basic validation
+                     if (value == null || value.isEmpty) return 'Ingresa tu correo';
+                     if (!value.contains('@') || !value.contains('.')) return 'Correo no válido';
+                     return null;
+                   },
+                   enabled: !_isLoggingIn, // Disable while logging in
+                   autovalidateMode: AutovalidateMode.onUserInteraction, // Validate as user types
+                ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.1),
+                const SizedBox(height: 16),
 
-            // Línea "¿Olvidaste tu contraseña?" clicable
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const OlvidoContrasenya(),
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: _inputDecoration(
+                    context: context,
+                    label: 'Contraseña',
+                    icon: Icons.lock_outline,
+                     // Add suffix icon to toggle visibility
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: colorScheme.onSurfaceVariant,
                       ),
-                    );
-                  },
-                  child: const Text(
-                    '¿Olvidaste tu contraseña?',
-                    style: TextStyle(
-                      color: Colors.purple,
-                      fontSize: 14,
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
+                  validator: (value) => value == null || value.isEmpty ? 'Ingresa tu contraseña' : null,
+                  enabled: !_isLoggingIn,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1),
+                const SizedBox(height: 10),
 
-            // "Recuérdame" con Switch
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Recuérdame"),
-                  Switch(
-                    activeColor: Colors.purple,
-                    value: rememberMe,
-                    onChanged: (value) {
-                      setState(() {
-                        rememberMe = value;
-                      });
+                // --- Forgot Password Link ---
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    // style: TextButton.styleFrom(padding: EdgeInsets.zero), // Keep default padding
+                    onPressed: _isLoggingIn ? null : () { // Disable if logging in
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const OlvidoContrasenya()),
+                      );
                     },
+                    child: Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(
+                        color: colorScheme.secondary, // Use secondary color
+                        // fontSize: 13, // Use theme default
+                      ),
+                    ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
+                ).animate().fadeIn(delay: 500.ms),
+                const SizedBox(height: 15),
 
-            // Botón "INGRESAR" con color condicional
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _iniciarSesion,
+                // --- Login Button ---
+                ElevatedButton(
+                  onPressed: _isLoggingIn ? null : _iniciarSesion, // Disable button when logging in
                   style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    backgroundColor: botonColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    // backgroundColor: colorScheme.primary, // Uses theme default
                   ),
-                  child: const Text(
-                    'INGRESAR',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Texto "También puedes iniciar sesión con ..."
-            const Text(
-              "También puedes iniciar sesión con ...",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-
-            // Iconos de redes sociales (simulados)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _socialIcon(Icons.alternate_email, Colors.lightBlue),
-                const SizedBox(width: 20),
-                _socialIcon(Icons.g_mobiledata, Colors.red),
-              ],
-            ),
-            const SizedBox(height: 30),
-
-            // "¿Aún no tienes cuenta? ¡Regístrate!" -> Navega a PaginaRegistro
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "¿Aún no tienes cuenta? ",
-                  style: TextStyle(color: Colors.grey),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PaginaRegistro(),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    "¡Regístrate!",
-                    style: TextStyle(
-                      color: Colors.purple,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-
-            // Contenedor para las DOS OLAS
-            SizedBox(
-              height: 200,
-              width: double.infinity,
-              child: Stack(
-                children: [
-                  // OLA ROSA (FONDO)
-                  Positioned.fill(
-                    child: ClipPath(
-                      clipper: PinkWaveClipper(),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0xFFF48FB1), // Rosa claro
-                              Color(0xFFF06292)  // Rosa más intenso
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                  child: _isLoggingIn
+                      ? SizedBox( // Show progress indicator
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: colorScheme.onPrimary, // Color for indicator on button
                           ),
+                        )
+                      : const Text(
+                          'INGRESAR',
+                          // style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.2),
+                const SizedBox(height: 30),
+
+                // --- Divider ---
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: colorScheme.outlineVariant)), // Themed divider
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      child: Text(
+                        "O inicia sesión con",
+                         style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: colorScheme.outlineVariant)),
+                  ],
+                ).animate().fadeIn(delay: 700.ms),
+                const SizedBox(height: 20),
+
+                // --- Social Login Icons ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                     _socialIcon(context, Icons.alternate_email, "Google"), // Example: Google
+                    const SizedBox(width: 20),
+                    _socialIcon(context, Icons.facebook, "Facebook"), // Example: Facebook
+                  ].animate(interval: 100.ms).fadeIn(delay: 800.ms).scale(begin: Offset(0.8, 0.8)), // Apply interval to children
+                ), // Animate Row container if needed, e.g., .animate().fadeIn(delay: 750.ms)
+                const SizedBox(height: 35),
+
+                // --- Sign Up Link ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "¿Aún no tienes cuenta? ",
+                      style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                     // Use TextButton for clearer interaction
+                    TextButton(
+                      onPressed: _isLoggingIn ? null : () { // Disable if logging in
+                        Navigator.pushReplacement( // Use replacement to avoid back button to login
+                          context,
+                          MaterialPageRoute(builder: (_) => const PaginaRegistro()),
+                        );
+                      },
+                      child: Text(
+                        "¡Regístrate!",
+                         style: TextStyle(
+                          color: colorScheme.primary, // Use theme primary color
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  ),
-                  // OLA MORADA (ENCIMA)
-                  Positioned.fill(
-                    child: ClipPath(
-                      clipper: PurpleWaveClipper(),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0xFFBA68C8), // Morado claro
-                              Color(0xFF9C27B0)  // Morado más oscuro
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ).animate().fadeIn(delay: 900.ms),
+                const SizedBox(height: 20), // Bottom padding
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // Helper para iconos de redes sociales
-  Widget _socialIcon(IconData icon, Color color) {
-    return Container(
-      width: 45,
-      height: 45,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        color: color,
-        size: 24,
-      ),
+   // --- Helper for Input Decoration (Using Theme - same as Registro) ---
+  InputDecoration _inputDecoration({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+     final theme = Theme.of(context);
+     return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 20),
+      suffixIcon: suffixIcon,
+      // Styles like filled, border, etc., are inherited from theme's inputDecorationTheme
     );
+  }
+
+  // --- Helper for Social Icons (Using Theme - same as Registro) ---
+  Widget _socialIcon(BuildContext context, IconData icon, String tooltip) {
+     final colorScheme = Theme.of(context).colorScheme;
+     return Tooltip(
+       message: "Iniciar sesión con $tooltip",
+       child: InkWell(
+         onTap: _isLoggingIn ? null : () { // Disable if logging in
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text("Inicio con $tooltip no implementado")),
+           );
+         },
+         borderRadius: BorderRadius.circular(25),
+         child: Container(
+           width: 50,
+           height: 50,
+           decoration: BoxDecoration(
+             color: colorScheme.surfaceVariant.withOpacity(0.8),
+             shape: BoxShape.circle,
+             border: Border.all(color: colorScheme.outlineVariant, width: 1),
+           ),
+           child: Icon(
+             icon,
+             color: colorScheme.primary,
+             size: 24,
+           ),
+         ),
+       ),
+     );
   }
 }

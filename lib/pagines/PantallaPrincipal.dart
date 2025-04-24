@@ -4,7 +4,13 @@ import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
-import '../widgetsutilizados/burbujaestilo.dart';
+import 'package:recetas360/widgetsutilizados/burbujaestilo.dart';
+// Asegúrate que la ruta a Burbujawidget sea correcta según tu estructura
+
+import 'package:flutter_animate/flutter_animate.dart';
+
+// Current User's Login: joelramoss
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:13:49
 
 class Pantallaprincipal extends StatefulWidget {
   const Pantallaprincipal({Key? key}) : super(key: key);
@@ -15,14 +21,21 @@ class Pantallaprincipal extends StatefulWidget {
 
 class _PantallaBurbujasState extends State<Pantallaprincipal>
     with SingleTickerProviderStateMixin {
-  // Mapa de categorías: nombre y URL de imagen
+  // TODO: Reemplaza con URLs reales o assets locales
   final Map<String, String> tiposAlimento = {
-    "Carne": "https://firebasestorage.googleapis.com/v0/b/...carne.jpg",
-    "Pescado": "https://firebasestorage.googleapis.com/v0/b/...pescado.jpg",
-    "Verduras": "https://firebasestorage.googleapis.com/v0/b/...verduras.jpg",
-    "Lácteos": "https://firebasestorage.googleapis.com/v0/b/...lacteos.jpg",
-    "Cereales": "https://firebasestorage.googleapis.com/v0/b/...cereales.jpg",
+    "Carne":
+        "https://images.unsplash.com/photo-1603360946369-dc9bb6b8bffd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
+    "Pescado":
+        "https://images.unsplash.com/photo-1599742836364-f8744693416a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
+    "Verduras":
+        "https://images.unsplash.com/photo-1590779033100-9f60a05a013d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
+    "Lácteos":
+        "https://images.unsplash.com/photo-1620189029037-f675b56c1940?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
+    "Cereales":
+        "https://images.unsplash.com/photo-1509909756405-be0199881695?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
   };
+  final String imagenTodo =
+      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"; // Imagen para "Todo"
 
   late AnimationController _controller;
   late List<Animation<double>> _bubbleAnimations;
@@ -32,7 +45,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1500),
     );
     _initializeAnimations();
     _controller.forward();
@@ -40,24 +53,29 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
 
   void _initializeAnimations() {
     final int n = tiposAlimento.length;
-    final double intervalLength = 1.0 / n;
+    final double intervalLength = 0.6 / n;
+    final double startOffset = 0.1;
 
     _bubbleAnimations = List.generate(n, (i) {
-      double start = i * intervalLength;
+      double start = startOffset + (i * intervalLength * 0.8);
       double end = start + intervalLength;
+      end = math.min(end, 1.0);
+      start = math.min(start, end);
+
       return Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _controller,
-          curve: Interval(start, end, curve: Curves.easeOutCirc),
+          curve: Interval(start, end, curve: Curves.elasticOut),
         ),
       );
     });
   }
 
   void _restartAnimation() {
-    _controller.reset();
-    _initializeAnimations();
-    _controller.forward();
+    if (_bubbleAnimations.length != tiposAlimento.length) {
+      _initializeAnimations();
+    }
+    _controller.forward(from: 0.0);
   }
 
   @override
@@ -66,104 +84,68 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     super.dispose();
   }
 
+  void _navigateTo(Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page))
+        .then((_) => _restartAnimation());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.orangeAccent,
+        title: const Text("Recetas 360"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite, color: Colors.white),
-            iconSize: 32,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const RecetasFavoritas(),
-                ),
-              ).then((_) {
-                _restartAnimation();
-              });
-            },
-          ),
+              icon: const Icon(Icons.favorite_border_outlined),
+              tooltip: "Favoritos",
+              onPressed: () => _navigateTo(const RecetasFavoritas())),
           IconButton(
-            icon: const Icon(Icons.history, color: Colors.white),
-            iconSize: 32,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const HistorialRecetas(),
-                ),
-              ).then((_) {
-                _restartAnimation();
-              });
-            },
-          ),
+              icon: const Icon(Icons.history_outlined),
+              tooltip: "Historial",
+              onPressed: () => _navigateTo(const HistorialRecetas())),
           IconButton(
-            iconSize: 32,
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PaginaAjustes(),
-                ),
-              ).then((_) {
-                _restartAnimation();
-              });
-            },
-          ),
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: "Ajustes",
+              onPressed: () => _navigateTo(const PaginaAjustes())),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.orangeAccent,
-              Colors.pink.shade100,
-            ],
+      body: Column(
+        children: [
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+            child: Text(
+              "Explora tus categorías",
+              style: textTheme.headlineMedium?.copyWith(
+                  color: colorScheme.primary, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
           ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              height: 50,
-              child: const Center(
-                child: Text(
-                  "Explora tus categorías",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black45,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final double boxWidth = constraints.maxWidth;
-                  final double boxHeight = constraints.maxHeight;
-                  final double centerX = boxWidth / 2;
-                  final double centerY = boxHeight / 2;
-                  final double minSide = math.min(boxWidth, boxHeight);
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double boxWidth = constraints.maxWidth;
+                final double boxHeight = constraints.maxHeight;
+                final double centerX = boxWidth / 2;
+                final double centerY =
+                    boxHeight / 2 * 0.95; // Ligeramente más arriba
+                final double minSide = math.min(boxWidth, boxHeight);
+                final double radius =
+                    minSide * 0.35; // Radio del círculo de burbujas
+                final double outerBubbleSize =
+                    minSide * 0.25; // Tamaño burbujas exteriores
+                final double centerBubbleSize =
+                    minSide * 0.30; // Tamaño burbuja central
 
-                  final double radius = minSide * 0.30;
-                  final double outerBubbleSize = minSide * 0.28;
-                  final double centerBubbleSize = minSide * 0.25;
-
-                  return Stack(
+                return Container(
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
                       ..._buildBurbujas(
                         centerX: centerX,
@@ -171,22 +153,23 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                         radius: radius,
                         bubbleSize: outerBubbleSize,
                       ),
-                      Positioned(
-                        left: centerX - (centerBubbleSize / 2),
-                        top: centerY - (centerBubbleSize / 2),
-                        child: Burbujawidget(
-                          text: "Comida",
-                          size: centerBubbleSize,
-                          onTap: () {},
-                        ),
-                      ),
+                      Burbujawidget(
+                        text: "Todo",
+                        size: centerBubbleSize,
+                        imageUrl: imagenTodo,
+                        onTap: () => _navigateTo(const PantallaGastronomias(
+                            tipoAlimento: "Todo")),
+                      ).animate().scale(
+                          delay: 500.ms,
+                          duration: 800.ms,
+                          curve: Curves.elasticOut),
                     ],
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -201,6 +184,10 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     final entries = tiposAlimento.entries.toList();
     final int n = entries.length;
 
+    if (_bubbleAnimations.length != n) {
+      _initializeAnimations();
+    }
+
     for (int i = 0; i < n; i++) {
       final String tipo = entries[i].key;
       final String url = entries[i].value;
@@ -211,14 +198,22 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
           animation: _bubbleAnimations[i],
           builder: (context, child) {
             double value = _bubbleAnimations[i].value;
-            final double x = centerX + radius * value * math.cos(angle);
-            final double y = centerY + radius * value * math.sin(angle);
+            final double currentRadius = radius * value;
+            final double x = centerX + currentRadius * math.cos(angle);
+            final double y = centerY + currentRadius * math.sin(angle);
+
+            final double finalLeft = x - (bubbleSize / 2);
+            final double finalTop = y - (bubbleSize / 2);
+
+            if (value <= 0 || finalLeft.isNaN || finalTop.isNaN) {
+              return const SizedBox.shrink();
+            }
 
             return Positioned(
-              left: x - (bubbleSize / 2),
-              top: y - (bubbleSize / 2),
+              left: finalLeft,
+              top: finalTop,
               child: Opacity(
-                opacity: value,
+                opacity: math.min(value * 1.5, 1.0),
                 child: Transform.scale(
                   scale: value,
                   child: child,
@@ -229,16 +224,8 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
           child: Burbujawidget(
             text: tipo,
             size: bubbleSize,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PantallaGastronomias(tipoAlimento: tipo),
-                ),
-              ).then((_) {
-                _restartAnimation();
-              });
-            },
+            imageUrl: url,
+            onTap: () => _navigateTo(PantallaGastronomias(tipoAlimento: tipo)),
           ),
         ),
       );

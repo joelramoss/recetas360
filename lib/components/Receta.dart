@@ -9,8 +9,6 @@ class Receta {
   final Map<String, dynamic>? nutritionalInfo;
   final String categoria;
   final String gastronomia;
-
-  // Nuevo campo: pasos de la receta
   final List<String> pasos;
 
   Receta({
@@ -24,10 +22,9 @@ class Receta {
     this.nutritionalInfo,
     required this.categoria,
     required this.gastronomia,
-    required this.pasos, // <-- Campo obligatorio
+    required this.pasos,
   });
 
-  // Convierte la receta en Map para Firestore
   Map<String, dynamic> toMap() {
     return {
       'nombre': nombre,
@@ -39,14 +36,14 @@ class Receta {
       'nutritionalInfo': nutritionalInfo,
       'categoria': categoria,
       'gastronomia': gastronomia,
-      'pasos': pasos, // <-- Guardamos los pasos
+      'pasos': pasos,
     };
   }
 
-  // Crea una receta desde un Map de Firestore
-  factory Receta.fromFirestore(Map<String, dynamic> data) {
+  // Crea una receta desde un Map de Firestore y su ID
+  factory Receta.fromFirestore(Map<String, dynamic> data, String documentId) {
     return Receta(
-      id: data['id'] ?? '',
+      id: documentId,
       nombre: data['nombre'] ?? '',
       urlImagen: data['urlImagen'] ?? '',
       ingredientes: List<String>.from(data['ingredientes'] ?? []),
@@ -56,7 +53,7 @@ class Receta {
       nutritionalInfo: data['nutritionalInfo'],
       categoria: data['categoria'] ?? '',
       gastronomia: data['gastronomia'] ?? '',
-      pasos: List<String>.from(data['pasos'] ?? []), // <-- Leemos los pasos
+      pasos: List<String>.from(data['pasos'] ?? []),
     );
   }
 }

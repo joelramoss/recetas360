@@ -3,10 +3,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';
 import 'firebase_options.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart'; // Import FlexColorScheme
+import 'package:google_fonts/google_fonts.dart';       // Import GoogleFonts
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializa Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -29,39 +31,68 @@ void main() async {
         .set({'completada': true});
   }
 
+  // Set up Google Fonts license (optional but recommended)
+  GoogleFonts.config.allowRuntimeFetching = false;
+
   runApp(const MyApp());
 }
 
 // Método para actualizar los nombres en los comentarios
 Future<void> actualizarNombresEnComentarios() async {
   try {
-    QuerySnapshot comentariosSnapshot =
-        await FirebaseFirestore.instance.collection('comentarios').get();
+    QuerySnapshot recetasSnapshot =
+        await FirebaseFirestore.instance.collection('recetas').get();
 
-    for (var comentarioDoc in comentariosSnapshot.docs) {
-      // Verificar si el campo usuarioId existe
-      if (comentarioDoc.data().toString().contains('usuarioId')) {
-        String usuarioId = comentarioDoc.get('usuarioId');
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(usuarioId)
-            .get();
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+    int batchCounter = 0;
 
-        if (userDoc.exists) {
-          String nombreUsuario = userDoc.get('nombre') ?? 'Usuario desconocido';
-          await comentarioDoc.reference.update({
-            'usuarioNombre': nombreUsuario,
-          });
-        } else {
-          print('Usuario no encontrado para usuarioId: $usuarioId');
+    for (var recetaDoc in recetasSnapshot.docs) {
+      QuerySnapshot comentariosSnapshot = await recetaDoc.reference
+          .collection('comentarios')
+          .get();
+
+      for (var comentarioDoc in comentariosSnapshot.docs) {
+        final data = comentarioDoc.data() as Map<String, dynamic>?;
+
+        if (data != null && data.containsKey('usuarioId') && (!data.containsKey('usuarioNombre') || data['usuarioNombre'] == 'Usuario desconocido')) {
+          String usuarioId = data['usuarioId'];
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(usuarioId)
+              .get();
+
+          if (userDoc.exists) {
+            String nombreUsuario = (userDoc.data() as Map<String, dynamic>?)?['nombre'] ?? 'Usuario desconocido';
+            batch.update(comentarioDoc.reference, {'usuarioNombre': nombreUsuario});
+            batchCounter++;
+
+            if (batchCounter >= 400) {
+              await batch.commit();
+              batch = FirebaseFirestore.instance.batch();
+              batchCounter = 0;
+            }
+          } else {
+            batch.update(comentarioDoc.reference, {'usuarioNombre': 'Usuario eliminado'});
+            batchCounter++;
+            if (batchCounter >= 400) {
+              await batch.commit();
+              batch = FirebaseFirestore.instance.batch();
+              batchCounter = 0;
+            }
+          }
+        } else if (data == null || !data.containsKey('usuarioId')) {
+          print('Comentario sin usuarioId o data null: ${comentarioDoc.id} en receta ${recetaDoc.id}');
         }
-      } else {
-        print('Comentario sin usuarioId: ${comentarioDoc.id}');
       }
     }
-    print('Comentarios actualizados exitosamente');
+
+    if (batchCounter > 0) {
+      await batch.commit();
+    }
+
+    print('Actualización de nombres en comentarios completada.');
   } catch (e) {
-    print('Error al actualizar comentarios: $e');
+    print('Error al actualizar nombres en comentarios: $e');
   }
 }
 
@@ -70,13 +101,50 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final poppinsTextTheme = GoogleFonts.poppinsTextTheme(textTheme);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Recetas360',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      theme: FlexThemeData.light(
+        scheme: FlexScheme.mango,
+        surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
+        blendLevel: 7,
+        subThemesData: const FlexSubThemesData(
+          blendOnLevel: 10,
+          blendOnColors: false,
+          useTextTheme: true,
+          useM2StyleDividerInM3: true,
+          alignedDropdown: true,
+          useInputDecoratorThemeInDialogs: true,
+          inputDecoratorRadius: 20.0,
+        ),
+        visualDensity: FlexColorScheme.comfortablePlatformDensity,
         useMaterial3: true,
+        swapLegacyOnMaterial3: true,
+        textTheme: poppinsTextTheme,
+        primaryTextTheme: poppinsTextTheme,
       ),
+      darkTheme: FlexThemeData.dark(
+        scheme: FlexScheme.mango,
+        surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
+        blendLevel: 13,
+        subThemesData: const FlexSubThemesData(
+          blendOnLevel: 20,
+          useTextTheme: true,
+          useM2StyleDividerInM3: true,
+          alignedDropdown: true,
+          useInputDecoratorThemeInDialogs: true,
+          inputDecoratorRadius: 20.0,
+        ),
+        visualDensity: FlexColorScheme.comfortablePlatformDensity,
+        useMaterial3: true,
+        swapLegacyOnMaterial3: true,
+        textTheme: poppinsTextTheme,
+        primaryTextTheme: poppinsTextTheme,
+      ),
+      themeMode: ThemeMode.system,
       home: const Paginalogin(),
     );
   }
