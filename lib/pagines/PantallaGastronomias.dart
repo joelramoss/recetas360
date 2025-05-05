@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:recetas360/components/ListaRecetas.dart'; // Asegúrate que esta ruta es correcta
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
+import 'package:recetas360/pagines/RecetasFavoritas.dart';
 // Asegúrate que la ruta a Burbujawidget sea correcta
 import '../widgetsutilizados/burbujaestilo.dart'; // O '../widgetsutilizados/Burbujawidget.dart' si lo renombraste
 import 'package:flutter_animate/flutter_animate.dart';
@@ -120,6 +121,10 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
         title:
             Text(widget.tipoAlimento), // Muestra categoría principal en título
         actions: [
+          IconButton(
+              icon: const Icon(Icons.favorite_border_outlined),
+              tooltip: "Favoritos",
+              onPressed: () => _navigateTo(const RecetasFavoritas())),
           // Usa iconos tematizados y helper de navegación consistente
           IconButton(
             icon: const Icon(Icons.history_outlined),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart'; // Import Google Sign-In
 import 'package:recetas360/pagines/PaginaLogin.dart'; // Corrected import name
 import 'package:recetas360/pagines/PantallaPrincipal.dart'; // Corrected import name
 import 'package:flutter_animate/flutter_animate.dart'; // Import animate
@@ -21,6 +22,7 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
   final TextEditingController nameController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(); // Instance for Google Sign-In
 
   bool _isRegistering = false; // Flag for registration progress
   bool _obscurePassword = true; // Toggle password visibility
@@ -111,6 +113,74 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
     } finally {
       if (mounted) {
         setState(() => _isRegistering = false); // Reset flag
+      }
+    }
+  }
+
+  // Google Sign-In / Registration Logic
+  Future<void> _signInWithGoogle() async {
+    if (_isRegistering) return;
+    setState(() => _isRegistering = true);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    try {
+      // Trigger the Google authentication flow.
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      // Obtain the auth details from the request.
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        if (mounted) setState(() => _isRegistering = false);
+        return;
+      }
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential for Firebase
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the credential
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        // Check if it's a new user (first time signing in with Google)
+        if (userCredential.additionalUserInfo?.isNewUser ?? false) {
+          // Store user data in Firestore for new users
+          await _firestore.collection('usuarios').doc(user.uid).set({
+            'uid': user.uid,
+            'nombre': user.displayName ?? 'Usuario Google', // Use Google display name
+            'email': user.email ?? '', // Use Google email
+            'fecha_creacion': FieldValue.serverTimestamp(),
+            // Add other fields if needed, e.g., photoURL: user.photoURL
+          });
+        }
+        // For both new and existing Google users, navigate to main screen
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+          (route) => false,
+        );
+      } else {
+         // Handle case where user is null after sign-in (should be rare)
+         throw Exception("Usuario nulo después del inicio de sesión con Google.");
+      }
+
+    } catch (e) {
+      print("Error during Google Sign-In/Registration: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al iniciar sesión con Google.", style: TextStyle(color: colorScheme.onError)),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isRegistering = false);
       }
     }
   }
@@ -248,11 +318,9 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _socialIcon(context, Icons.alternate_email, "Google"), // Example: Google
-                    const SizedBox(width: 20),
-                    _socialIcon(context, Icons.facebook, "Facebook"), // Example: Facebook
+                    _socialIcon(context, Icons.alternate_email, "Google", _signInWithGoogle), // Updated Google Icon
                   ],
-                ).animate(delay: 800.ms).fadeIn().scale(begin: Offset(0.8, 0.8)), // Removed invalid 'interval' parameter
+                ).animate(delay: 800.ms).fadeIn().scale(begin: Offset(0.8, 0.8)),
                 const SizedBox(height: 35),
 
                 // --- Login Link ---
@@ -322,16 +390,13 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
   }
 
   // --- Helper for Social Icons (Using Theme) ---
-  Widget _socialIcon(BuildContext context, IconData icon, String tooltip) {
+  Widget _socialIcon(BuildContext context, IconData icon, String tooltip, VoidCallback? onTapAction) { // Added onTapAction parameter
      final colorScheme = Theme.of(context).colorScheme;
      return Tooltip( // Add tooltip for accessibility
        message: "Registrarse con $tooltip",
        child: InkWell(
-         onTap: _isRegistering ? null : () { // Disable if registering
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text("Registro con $tooltip no implementado")),
-           );
-         },
+         // Use the passed function, disable if registering or no function provided
+         onTap: _isRegistering || onTapAction == null ? null : onTapAction,
          borderRadius: BorderRadius.circular(25),
          child: Container(
            width: 50,

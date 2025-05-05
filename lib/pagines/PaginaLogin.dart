@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart'; // Import Google Sign-In
 import 'package:recetas360/pagines/OlvidoContrasenya.dart'; // Corrected import name
 import 'package:recetas360/pagines/PantallaPrincipal.dart'; // Corrected import name
 import 'package:recetas360/pagines/PaginaRegistro.dart'; // Corrected import name
@@ -16,15 +17,13 @@ class Paginalogin extends StatefulWidget {
 }
 
 class _PaginaloginState extends State<Paginalogin> {
-  // bool rememberMe = false; // Removed, not used
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(); // Instance for Google Sign-In
 
   bool _isLoggingIn = false; // Flag for login progress
   bool _obscurePassword = true; // Toggle password visibility
-
-  // Removed listeners as they only called setState without specific logic
 
   @override
   void dispose() {
@@ -102,12 +101,61 @@ class _PaginaloginState extends State<Paginalogin> {
     }
   }
 
+  // Google Sign-In Logic
+  Future<void> _signInWithGoogle() async {
+    if (_isLoggingIn) return;
+    setState(() => _isLoggingIn = true);
+    final colorScheme = Theme.of(context).colorScheme; // Get theme colors
+
+    try {
+      // Trigger the Google authentication flow.
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      // Obtain the auth details from the request.
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        if (mounted) setState(() => _isLoggingIn = false);
+        return;
+      }
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential for Firebase
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the credential
+      await _auth.signInWithCredential(credential);
+
+      // Navigate on success
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+        (route) => false,
+      );
+
+    } catch (e) {
+      print("Error during Google Sign-In: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al iniciar sesión con Google.", style: TextStyle(color: colorScheme.onError)),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoggingIn = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
-    // Removed dynamic button color based on camposLlenos, button state handled by onPressed
 
     return Scaffold(
       // Use theme background color - remove Container with gradient
@@ -119,11 +167,6 @@ class _PaginaloginState extends State<Paginalogin> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                 // --- App Logo (Optional) ---
-                // Icon(Icons.restaurant_menu, size: 60, color: colorScheme.primary),
-                // const SizedBox(height: 20),
-
-                // --- Title ---
                 Text(
                   "Iniciar Sesión",
                   textAlign: TextAlign.center,
@@ -246,9 +289,7 @@ class _PaginaloginState extends State<Paginalogin> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                     _socialIcon(context, Icons.alternate_email, "Google"), // Example: Google
-                    const SizedBox(width: 20),
-                    _socialIcon(context, Icons.facebook, "Facebook"), // Example: Facebook
+                     _socialIcon(context, Icons.alternate_email, "Google", _signInWithGoogle), // Updated Google Icon
                   ].animate(interval: 100.ms).fadeIn(delay: 800.ms).scale(begin: Offset(0.8, 0.8)), // Apply interval to children
                 ), // Animate Row container if needed, e.g., .animate().fadeIn(delay: 750.ms)
                 const SizedBox(height: 35),
@@ -304,17 +345,13 @@ class _PaginaloginState extends State<Paginalogin> {
     );
   }
 
-  // --- Helper for Social Icons (Using Theme - same as Registro) ---
-  Widget _socialIcon(BuildContext context, IconData icon, String tooltip) {
+  // --- Helper for Social Icons (Updated to include onTapAction) ---
+  Widget _socialIcon(BuildContext context, IconData icon, String tooltip, VoidCallback? onTapAction) {
      final colorScheme = Theme.of(context).colorScheme;
      return Tooltip(
        message: "Iniciar sesión con $tooltip",
        child: InkWell(
-         onTap: _isLoggingIn ? null : () { // Disable if logging in
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text("Inicio con $tooltip no implementado")),
-           );
-         },
+         onTap: _isLoggingIn || onTapAction == null ? null : onTapAction,
          borderRadius: BorderRadius.circular(25),
          child: Container(
            width: 50,
