@@ -10,6 +10,8 @@ import 'package:recetas360/pagines/HistorialRecetas.dart'; // Ensure this import
 import 'package:flutter_animate/flutter_animate.dart'; // Import flutter_animate
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
 import 'package:shimmer/shimmer.dart'; // Import shimmer
+import 'package:share_plus/share_plus.dart'; // Import share_plus
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart'; // Importar
 
 // Current User's Login: joelramoss
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:49:18
@@ -487,6 +489,65 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                       MaterialPageRoute(
                                           builder: (_) =>
                                               EditarReceta(receta: receta))),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                // Share
+                                IconButton(
+                                  icon: const Icon(Icons.share_rounded),
+                                  color: colorScheme.tertiary,
+                                  tooltip: "Compartir receta",
+                                  onPressed: () async {
+                                    final String recipeName = receta.nombre;
+                                    final String recipeId = receta.id;
+                                    final String deepLinkUrl =
+                                        "https://recetas360.com/receta?id=$recipeId";
+
+                                    final DynamicLinkParameters parameters =
+                                        DynamicLinkParameters(
+                                      uriPrefix:
+                                          'https://recetas360.page.link', //a CORRECTO: Solo el dominio con https
+                                      link: Uri.parse(deepLinkUrl),
+                                      androidParameters:
+                                          const AndroidParameters(
+                                        packageName: 'com.example.recetas360',
+                                        minimumVersion: 0,
+                                      ),
+                                      iosParameters: const IOSParameters(
+                                        bundleId: 'com.example.recetas360',
+                                        minimumVersion: '0',
+                                      ),
+                                      socialMetaTagParameters:
+                                          SocialMetaTagParameters(
+                                        title:
+                                            '¡Mira esta receta: $recipeName!',
+                                        description:
+                                            'Descubre cómo preparar $recipeName en Recetas360.',
+                                        imageUrl:
+                                            Uri.tryParse(receta.urlImagen),
+                                      ),
+                                    );
+
+                                    try {
+                                      final ShortDynamicLink shortLink =
+                                          await FirebaseDynamicLinks.instance
+                                              .buildShortLink(parameters);
+                                      final Uri shortUrl = shortLink.shortUrl;
+                                      Share.share(
+                                        '¡Echa un vistazo a esta receta: $recipeName! ${shortUrl.toString()}',
+                                        subject: 'Receta: $recipeName',
+                                      );
+                                    } catch (e) {
+                                      print(
+                                          "Error al crear el enlace dinámico: $e");
+                                      final String shareText =
+                                          "¡Mira esta deliciosa receta: $recipeName!\n\n"
+                                          "Tiempo: ${receta.tiempoMinutos} min\n"
+                                          "Calificación: ${receta.calificacion} estrellas\n\n"
+                                          "Encuéntrala en Recetas360.";
+                                      Share.share(shareText,
+                                          subject: 'Receta: $recipeName');
+                                    }
+                                  },
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 // Delete

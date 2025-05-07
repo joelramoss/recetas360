@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+import 'package:recetas360/components/DetalleReceta.dart';
+import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';
 import 'firebase_options.dart';
-import 'package:flex_color_scheme/flex_color_scheme.dart'; // Import FlexColorScheme
-import 'package:google_fonts/google_fonts.dart';       // Import GoogleFonts
+import 'package:flex_color_scheme/flex_color_scheme.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Inicializa Firebase
@@ -96,8 +99,59 @@ Future<void> actualizarNombresEnComentarios() async {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
+
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _initDynamicLinks();
+  }
+
+  Future<void> _initDynamicLinks() async {
+    FirebaseDynamicLinks.instance.onLink.listen((PendingDynamicLinkData? dynamicLinkData) {
+      if (dynamicLinkData != null) {
+        _handleDeepLink(dynamicLinkData.link);
+      }
+    }).onError((error) {
+      print('Error en onLink de Dynamic Links: $error');
+    });
+
+    final PendingDynamicLinkData? initialLink = await FirebaseDynamicLinks.instance.getInitialLink();
+    if (initialLink != null) {
+      _handleDeepLink(initialLink.link);
+    }
+  }
+
+  void _handleDeepLink(Uri deepLink) async {
+    print("Deep Link recibido: $deepLink");
+    if (deepLink.pathSegments.contains('receta')) {
+      final String? recipeId = deepLink.queryParameters['id'];
+      if (recipeId != null && recipeId.isNotEmpty) {
+        print("Navegando a la receta con ID: $recipeId");
+        try {
+          DocumentSnapshot recipeDoc = await FirebaseFirestore.instance.collection('recetas').doc(recipeId).get();
+          if (recipeDoc.exists && recipeDoc.data() != null) {
+            final receta = Receta.fromFirestore(recipeDoc.data() as Map<String, dynamic>, recipeDoc.id);
+            navigatorKey.currentState?.push(MaterialPageRoute(
+              builder: (_) => DetalleReceta(receta: receta),
+            ));
+          } else {
+            print("Receta con ID $recipeId no encontrada.");
+          }
+        } catch (e) {
+          print("Error al cargar la receta desde el deep link: $e");
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +159,7 @@ class MyApp extends StatelessWidget {
     final poppinsTextTheme = GoogleFonts.poppinsTextTheme(textTheme);
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Recetas360',
       theme: FlexThemeData.light(

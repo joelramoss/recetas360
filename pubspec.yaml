@@ -15,6 +15,7 @@ dependencies:
   firebase_auth: ^4.19.6
   firebase_core: ^2.31.1
   firebase_storage: ^11.7.7
+  firebase_dynamic_links: 5.5.7 # O la última versión disponible
 
   # State Management & Utilities
   provider: ^6.1.2
@@ -33,6 +34,7 @@ dependencies:
   google_sign_in: ^6.2.1
   image_picker: ^1.1.1
   flutter_rating_bar: ^4.0.1
+  share_plus: ^9.0.0
 
 # Development dependencies
 dev_dependencies:
