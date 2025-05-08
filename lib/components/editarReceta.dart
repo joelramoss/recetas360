@@ -27,7 +27,7 @@ class IngredientSelection {
 // --- Edit Recipe Screen ---
 class EditarReceta extends StatefulWidget {
   final Receta receta;
-  const EditarReceta({Key? key, required this.receta}) : super(key: key);
+  const EditarReceta({super.key, required this.receta});
 
   @override
   _EditarRecetaState createState() => _EditarRecetaState();
@@ -94,8 +94,12 @@ class _EditarRecetaState extends State<EditarReceta> {
     _tiempoController.dispose();
     _categoriaController.dispose();
     _gastronomiaController.dispose();
-    for (var ing in _ingredients) ing.dispose();
-    for (var c in _stepControllers) c.dispose();
+    for (var ing in _ingredients) {
+      ing.dispose();
+    }
+    for (var c in _stepControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 

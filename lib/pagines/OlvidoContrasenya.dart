@@ -41,7 +41,7 @@ class PurpleWaveClipper extends CustomClipper<Path> {
 }
 
 class OlvidoContrasenya extends StatefulWidget {
-  const OlvidoContrasenya({Key? key}) : super(key: key);
+  const OlvidoContrasenya({super.key});
 
   @override
   State<OlvidoContrasenya> createState() => _OlvidoContrasenyaState();

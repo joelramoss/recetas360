@@ -11,7 +11,7 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 class PasosRecetaScreen extends StatefulWidget {
   final Receta receta;
 
-  const PasosRecetaScreen({Key? key, required this.receta}) : super(key: key);
+  const PasosRecetaScreen({super.key, required this.receta});
 
   @override
   _PasosRecetaScreenState createState() => _PasosRecetaScreenState();
@@ -85,7 +85,7 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
            final colorScheme = Theme.of(context).colorScheme;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('¡Tiempo completado para el paso!'),
+              content: const Text('¡Tiempo completado para el paso!'),
               // backgroundColor: colorScheme.primaryContainer, // Use theme indication
               // duration: const Duration(seconds: 5), // Default duration is usually fine
               action: SnackBarAction(

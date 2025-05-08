@@ -10,7 +10,7 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:45:14
 
 class HistorialRecetas extends StatefulWidget {
-  const HistorialRecetas({Key? key}) : super(key: key);
+  const HistorialRecetas({super.key});
 
   @override
   _HistorialRecetasState createState() => _HistorialRecetasState();

@@ -14,7 +14,7 @@ import 'package:shimmer/shimmer.dart'; // Import shimmer for comment loading
 class DetalleReceta extends StatefulWidget {
   final Receta receta;
 
-  const DetalleReceta({Key? key, required this.receta}) : super(key: key);
+  const DetalleReceta({super.key, required this.receta});
 
   @override
   _DetalleRecetaState createState() => _DetalleRecetaState();
@@ -617,11 +617,10 @@ class _DialogoRespuestaWidget extends StatefulWidget {
   final Future<void> Function(String respuestaTexto) onResponder;
 
   const _DialogoRespuestaWidget({
-    Key? key,
     required this.comentarioPadreId,
     required this.nombreUsuarioPadre,
     required this.onResponder,
-  }) : super(key: key);
+  });
 
   @override
   __DialogoRespuestaWidgetState createState() => __DialogoRespuestaWidgetState();

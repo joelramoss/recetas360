@@ -13,8 +13,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 class PantallaGastronomias extends StatefulWidget {
   final String tipoAlimento;
-  const PantallaGastronomias({Key? key, required this.tipoAlimento})
-      : super(key: key);
+  const PantallaGastronomias({super.key, required this.tipoAlimento});
 
   @override
   State<PantallaGastronomias> createState() => _PantallaGastronomiasState();
@@ -70,7 +69,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
       return;
     }
     final double intervalLength = 0.6 / n;
-    final double startOffset = 0.1;
+    const double startOffset = 0.1;
 
     _bubbleAnimations = List.generate(n, (i) {
       double start = startOffset + (i * intervalLength * 0.8);
@@ -171,7 +170,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
                     minSide * 0.30; // Tamaño burbuja categoría central
 
                 // --- DEBUG: Añade un contenedor con borde ---
-                return Container(
+                return SizedBox(
                   width: constraints
                       .maxWidth, // Asegura que use todo el ancho dado
                   height: constraints

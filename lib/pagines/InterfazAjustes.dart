@@ -9,7 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 
 // Renamed file/class to InterfazAjustes based on previous usage, adjust if needed
 class PaginaAjustes extends StatelessWidget {
-  const PaginaAjustes({Key? key}) : super(key: key);
+  const PaginaAjustes({super.key});
 
   // --- Logout Logic ---
   Future<void> _logout(BuildContext context) async {

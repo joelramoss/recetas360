@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:recetas360/components/agregarReceta.dart'; // Assuming function exists
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/nutritionalifno.dart'; // NutritionalInfo
-import 'package:recetas360/components/apiservice.dart'; // Assuming showProductoSelection exists
+// Assuming showProductoSelection exists
 import 'package:recetas360/components/selecciondeproducto.dart'; // Assuming needed for showProductoSelection context
 import 'package:recetas360/components/producto.dart';
 import 'package:flutter_animate/flutter_animate.dart'; // Import animate
@@ -21,7 +21,7 @@ class IngredientSelection {
 }
 
 class CrearRecetaScreen extends StatefulWidget {
-  const CrearRecetaScreen({Key? key}) : super(key: key);
+  const CrearRecetaScreen({super.key});
 
   @override
   _CrearRecetaScreenState createState() => _CrearRecetaScreenState();
@@ -34,8 +34,8 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
   final TextEditingController _descripcionController = TextEditingController();
   final TextEditingController _tiempoController = TextEditingController();
 
-  List<IngredientSelection> _ingredients = [];
-  List<TextEditingController> _stepControllers = [];
+  final List<IngredientSelection> _ingredients = [];
+  final List<TextEditingController> _stepControllers = [];
   int _calificacion = 3;
   NutritionalInfo _totalInfo = NutritionalInfo(
       energy: 0.0,
@@ -387,8 +387,9 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                         keyboardType: TextInputType.url,
                         validator: (value) {
                           // Basic URL validation
-                          if (value == null || value.isEmpty)
+                          if (value == null || value.isEmpty) {
                             return "Ingresa la URL";
+                          }
                           final uri = Uri.tryParse(value);
                           // Allow relative paths or check for scheme if needed
                           if (uri == null ||

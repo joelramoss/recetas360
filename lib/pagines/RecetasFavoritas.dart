@@ -7,7 +7,7 @@ import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class RecetasFavoritas extends StatefulWidget {
-  const RecetasFavoritas({Key? key}) : super(key: key);
+  const RecetasFavoritas({super.key});
 
   @override
   _RecetasFavoritasState createState() => _RecetasFavoritasState();
@@ -234,10 +234,10 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
                                             fit: BoxFit.cover,
                                             loadingBuilder: (context, child, progress) {
                                               if (progress == null) return child;
-                                              return Container(width: 65, height: 65, color: colorScheme.surfaceVariant, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+                                              return Container(width: 65, height: 65, color: colorScheme.surfaceContainerHighest, child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
                                             },
                                             errorBuilder: (context, error, stackTrace) {
-                                              return Container(width: 65, height: 65, color: colorScheme.surfaceVariant, child: Icon(Icons.broken_image_outlined, color: colorScheme.outline));
+                                              return Container(width: 65, height: 65, color: colorScheme.surfaceContainerHighest, child: Icon(Icons.broken_image_outlined, color: colorScheme.outline));
                                             },
                                           ),
                                         ),

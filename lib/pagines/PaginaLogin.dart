@@ -10,7 +10,7 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:41:09
 
 class Paginalogin extends StatefulWidget {
-  const Paginalogin({Key? key}) : super(key: key);
+  const Paginalogin({super.key});
 
   @override
   State<Paginalogin> createState() => _PaginaloginState();
@@ -290,7 +290,7 @@ class _PaginaloginState extends State<Paginalogin> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                      _socialIcon(context, Icons.alternate_email, "Google", _signInWithGoogle), // Updated Google Icon
-                  ].animate(interval: 100.ms).fadeIn(delay: 800.ms).scale(begin: Offset(0.8, 0.8)), // Apply interval to children
+                  ].animate(interval: 100.ms).fadeIn(delay: 800.ms).scale(begin: const Offset(0.8, 0.8)), // Apply interval to children
                 ), // Animate Row container if needed, e.g., .animate().fadeIn(delay: 750.ms)
                 const SizedBox(height: 35),
 
@@ -357,7 +357,7 @@ class _PaginaloginState extends State<Paginalogin> {
            width: 50,
            height: 50,
            decoration: BoxDecoration(
-             color: colorScheme.surfaceVariant.withOpacity(0.8),
+             color: colorScheme.surfaceContainerHighest.withOpacity(0.8),
              shape: BoxShape.circle,
              border: Border.all(color: colorScheme.outlineVariant, width: 1),
            ),

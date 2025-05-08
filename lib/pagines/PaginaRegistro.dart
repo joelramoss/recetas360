@@ -10,7 +10,7 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:38:21
 
 class PaginaRegistro extends StatefulWidget {
-  const PaginaRegistro({Key? key}) : super(key: key);
+  const PaginaRegistro({super.key});
 
   @override
   State<PaginaRegistro> createState() => _PaginaRegistroState();
@@ -320,7 +320,7 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
                   children: [
                     _socialIcon(context, Icons.alternate_email, "Google", _signInWithGoogle), // Updated Google Icon
                   ],
-                ).animate(delay: 800.ms).fadeIn().scale(begin: Offset(0.8, 0.8)),
+                ).animate(delay: 800.ms).fadeIn().scale(begin: const Offset(0.8, 0.8)),
                 const SizedBox(height: 35),
 
                 // --- Login Link ---
@@ -403,7 +403,7 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
            height: 50,
            decoration: BoxDecoration(
              // Use surface variant or outline for background/border
-             color: colorScheme.surfaceVariant.withOpacity(0.8),
+             color: colorScheme.surfaceContainerHighest.withOpacity(0.8),
              shape: BoxShape.circle,
              border: Border.all(color: colorScheme.outlineVariant, width: 1),
            ),

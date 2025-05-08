@@ -7,7 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:45:58
 
 class Editarusuario extends StatefulWidget {
-  const Editarusuario({Key? key}) : super(key: key);
+  const Editarusuario({super.key});
 
   @override
   _EditarusuarioState createState() => _EditarusuarioState();
@@ -109,7 +109,7 @@ class _EditarusuarioState extends State<Editarusuario> {
       // --- Update Firestore (if name changed) ---
       // Only update if the name actually changed to avoid unnecessary writes
       final currentFirestoreData = await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).get();
-      final currentFirestoreName = (currentFirestoreData.data() as Map<String, dynamic>?)?['nombre'] as String?;
+      final currentFirestoreName = (currentFirestoreData.data())?['nombre'] as String?;
 
       if (currentFirestoreName != newName) {
          await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).set(

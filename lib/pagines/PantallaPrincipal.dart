@@ -13,7 +13,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:13:49
 
 class Pantallaprincipal extends StatefulWidget {
-  const Pantallaprincipal({Key? key}) : super(key: key);
+  const Pantallaprincipal({super.key});
 
   @override
   State<Pantallaprincipal> createState() => _PantallaBurbujasState();
@@ -21,21 +21,14 @@ class Pantallaprincipal extends StatefulWidget {
 
 class _PantallaBurbujasState extends State<Pantallaprincipal>
     with SingleTickerProviderStateMixin {
-  // TODO: Reemplaza con URLs reales o assets locales
   final Map<String, String> tiposAlimento = {
-    "Carne":
-        "https://images.unsplash.com/photo-1603360946369-dc9bb6b8bffd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
-    "Pescado":
-        "https://images.unsplash.com/photo-1599742836364-f8744693416a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
-    "Verduras":
-        "https://images.unsplash.com/photo-1590779033100-9f60a05a013d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
-    "Lácteos":
-        "https://images.unsplash.com/photo-1620189029037-f675b56c1940?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
-    "Cereales":
-        "https://images.unsplash.com/photo-1509909756405-be0199881695?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80",
+    "Carne": "assets/images/carne.png",
+    "Pescado": "assets/images/pescado.png",
+    "Verduras": "assets/images/verdura.png",
+    "Lácteos": "assets/images/lacteos.png",
+    "Cereales": "assets/images/cereales.png",
   };
-  final String imagenTodo =
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"; // Imagen para "Todo"
+  final String imagenTodo = "assets/images/todo.png";
 
   late AnimationController _controller;
   late List<Animation<double>> _bubbleAnimations;
@@ -54,7 +47,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
   void _initializeAnimations() {
     final int n = tiposAlimento.length;
     final double intervalLength = 0.6 / n;
-    final double startOffset = 0.1;
+    const double startOffset = 0.1;
 
     _bubbleAnimations = List.generate(n, (i) {
       double start = startOffset + (i * intervalLength * 0.8);
@@ -140,7 +133,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 final double centerBubbleSize =
                     minSide * 0.30; // Tamaño burbuja central
 
-                return Container(
+                return SizedBox(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
                   

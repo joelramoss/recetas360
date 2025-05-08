@@ -21,10 +21,10 @@ class ListaRecetas extends StatefulWidget {
   final String subCategory;
 
   const ListaRecetas({
-    Key? key,
+    super.key,
     required this.mainCategory,
     required this.subCategory,
-  }) : super(key: key);
+  });
 
   @override
   _ListaRecetasState createState() => _ListaRecetasState();
