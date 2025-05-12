@@ -5,6 +5,7 @@ import 'package:recetas360/serveis/UsuarioUtil.dart';
 import 'Receta.dart';
 import 'nutritionalifno.dart';
 import 'package:recetas360/components/PasosRecetaScreen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DetalleReceta extends StatefulWidget {
   final Receta receta;
@@ -20,12 +21,16 @@ class _DetalleRecetaState extends State<DetalleReceta> {
   late CollectionReference _comentariosRef;
   final UsuarioUtil _usuarioUtil = UsuarioUtil();
   Map<String, bool> _ingredientesFaltantes = {};
+  Map<String, bool> _ingredientesSeleccionados = {};
 
   @override
   void initState() {
     super.initState();
     _comentariosRef = FirebaseFirestore.instance.collection('comentarios');
     _cargarIngredientesFaltantes();
+    for (var ing in widget.receta.ingredientes) {
+      _ingredientesSeleccionados[ing] = false;
+    }
   }
 
   Future<void> _cargarIngredientesFaltantes() async {
@@ -39,16 +44,20 @@ class _DetalleRecetaState extends State<DetalleReceta> {
           .get();
 
       if (doc.exists) {
+        final faltantes = Map<String, bool>.from(doc['ingredientes'] ?? {});
         setState(() {
-          _ingredientesFaltantes = Map<String, bool>.from(doc['ingredientes'] ?? {});
+          _ingredientesFaltantes = faltantes;
+          // Sincroniza los checkboxes con lo que hay en Firestore
+          for (var ing in widget.receta.ingredientes) {
+            _ingredientesSeleccionados[ing] = faltantes[ing] ?? false;
+          }
         });
       } else {
         setState(() {
-          _ingredientesFaltantes = Map.fromIterable(
-            widget.receta.ingredientes,
-            key: (ing) => ing,
-            value: (ing) => true,
-          );
+          _ingredientesFaltantes = {};
+          for (var ing in widget.receta.ingredientes) {
+            _ingredientesSeleccionados[ing] = false;
+          }
         });
       }
     }
@@ -69,17 +78,16 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     }
   }
 
-  void _marcarTodos(bool faltanTodos) {
+  void _marcarTodos(bool marcar) {
     setState(() {
-      _ingredientesFaltantes.updateAll((key, value) => faltanTodos);
+      for (var ing in widget.receta.ingredientes) {
+        _ingredientesSeleccionados[ing] = marcar;
+        _ingredientesFaltantes[ing] = marcar;
+      }
     });
     _guardarIngredientesFaltantes();
-    if (faltanTodos) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Se han guardado correctamente los ingredientes que debes comprar!'),
-        ),
-      );
+    for (var ing in widget.receta.ingredientes) {
+      _actualizarCarrito(ing, marcar);
     }
   }
 
@@ -125,6 +133,28 @@ class _DetalleRecetaState extends State<DetalleReceta> {
         .collection('comentarios')
         .orderBy('fecha', descending: true)
         .snapshots();
+  }
+
+  Future<void> _actualizarCarrito(String ingrediente, bool seleccionado) async {
+    String? userId = _usuarioUtil.getUidUsuarioActual();
+    if (userId == null) return;
+    final docRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .collection('recetas_faltantes')
+        .doc(widget.receta.id);
+
+    if (seleccionado) {
+      // Añadir ingrediente al carrito
+      await docRef.set({
+        'ingredientes.$ingrediente': true,
+      }, SetOptions(merge: true));
+    } else {
+      // Eliminar ingrediente del carrito
+      await docRef.set({
+        'ingredientes.$ingrediente': FieldValue.delete(),
+      }, SetOptions(merge: true));
+    }
   }
 
   @override
@@ -180,12 +210,14 @@ class _DetalleRecetaState extends State<DetalleReceta> {
             ...widget.receta.ingredientes.map((ing) {
               return CheckboxListTile(
                 title: Text(ing),
-                value: _ingredientesFaltantes[ing] ?? true,
-                onChanged: (bool? value) {
+                value: _ingredientesSeleccionados[ing] ?? false,
+                onChanged: (bool? value) async {
                   setState(() {
-                    _ingredientesFaltantes[ing] = value ?? true;
+                    _ingredientesSeleccionados[ing] = value ?? false;
+                    _ingredientesFaltantes[ing] = value ?? false;
                   });
-                  _guardarIngredientesFaltantes();
+                  await _guardarIngredientesFaltantes();
+                  await _actualizarCarrito(ing, value ?? false);
                 },
               );
             }).toList(),
