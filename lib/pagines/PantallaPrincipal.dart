@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:recetas360/components/CarritoRestante.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
-import '../widgetsutilizados/burbujaestilo.dart';
+import '../widgetsutilizados/burbujaestilo.dart';// Asegúrate de importar esta pantalla
 
 class Pantallaprincipal extends StatefulWidget {
   const Pantallaprincipal({Key? key}) : super(key: key);
@@ -70,6 +71,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: const Text('Explora tus recetas'), // Título personalizado
         backgroundColor: Colors.orangeAccent,
         actions: [
           IconButton(
@@ -95,6 +97,18 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 MaterialPageRoute(
                   builder: (_) => const HistorialRecetas(),
                 ),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.shopping_cart, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CarritoFaltantes()),
               ).then((_) {
                 _restartAnimation();
               });
@@ -246,3 +260,4 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     return bubbles;
   }
 }
+
