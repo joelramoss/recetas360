@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/components/Receta.dart'; // Ensure path is correct
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:recetas360/serveis/UsuarioUtil.dart';
+import 'Receta.dart';
+import 'nutritionalifno.dart';
+import 'package:recetas360/components/PasosRecetaScreen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:recetas360/serveis/UsuarioUtil.dart'; // Ensure path is correct
 // import 'nutritionalifno.dart'; // Uncomment if using this file and verify path
 import 'package:recetas360/components/PasosRecetaScreen.dart'; // Ensure path is correct
@@ -22,6 +27,8 @@ class DetalleReceta extends StatefulWidget {
 
 class _DetalleRecetaState extends State<DetalleReceta> {
   final TextEditingController _comentarioController = TextEditingController();
+  Map<String, bool> _ingredientesFaltantes = {};
+  Map<String, bool> _ingredientesSeleccionados = {};
   final ScrollController _scrollController = ScrollController();
   final UsuarioUtil _usuarioUtil = UsuarioUtil();
 
@@ -42,6 +49,64 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     // Intl.defaultLocale = 'es_ES'; // Example: Initialize locale in main.dart or here
     _cargarComentariosIniciales();
     _scrollController.addListener(_scrollListener);
+  }
+
+  Future<void> _cargarIngredientesFaltantes() async {
+    String? userId = _usuarioUtil.getUidUsuarioActual();
+    if (userId != null) {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('recetas_faltantes')
+          .doc(widget.receta.id)
+          .get();
+
+      if (doc.exists) {
+        final faltantes = Map<String, bool>.from(doc['ingredientes'] ?? {});
+        setState(() {
+          _ingredientesFaltantes = faltantes;
+          // Sincroniza los checkboxes con lo que hay en Firestore
+          for (var ing in widget.receta.ingredientes) {
+            _ingredientesSeleccionados[ing] = faltantes[ing] ?? false;
+          }
+        });
+      } else {
+        setState(() {
+          _ingredientesFaltantes = {};
+          for (var ing in widget.receta.ingredientes) {
+            _ingredientesSeleccionados[ing] = false;
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _guardarIngredientesFaltantes() async {
+    String? userId = _usuarioUtil.getUidUsuarioActual();
+    if (userId != null) {
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('recetas_faltantes')
+          .doc(widget.receta.id)
+          .set({
+        'ingredientes': _ingredientesFaltantes,
+        'recetaNombre': widget.receta.nombre,
+      });
+    }
+  }
+
+  void _marcarTodos(bool marcar) {
+    setState(() {
+      for (var ing in widget.receta.ingredientes) {
+        _ingredientesSeleccionados[ing] = marcar;
+        _ingredientesFaltantes[ing] = marcar;
+      }
+    });
+    _guardarIngredientesFaltantes();
+    for (var ing in widget.receta.ingredientes) {
+      _actualizarCarrito(ing, marcar);
+    }
   }
 
   @override
@@ -180,6 +245,40 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     }
   }
 
+  Future<void> _actualizarCarrito(String ingrediente, bool seleccionado) async {
+    String? userId = _usuarioUtil.getUidUsuarioActual();
+    if (userId == null) return;
+    final docRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .collection('recetas_faltantes')
+        .doc(widget.receta.id);
+
+    if (seleccionado) {
+      // Añadir ingrediente al carrito
+      await docRef.set({
+        'ingredientes.$ingrediente': true,
+      }, SetOptions(merge: true));
+    } else {
+      // Eliminar ingrediente del carrito
+      await docRef.set({
+        'ingredientes.$ingrediente': FieldValue.delete(),
+      }, SetOptions(merge: true));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.receta.nombre),
+        backgroundColor: Colors.orangeAccent,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.shopping_cart),
+            onPressed: () => _mostrarIngredientesFaltantes(context),
+          ),
+        ],
    Future<void> _borrarComentario(String comentarioId) async {
        final colorScheme = Theme.of(context).colorScheme;
        // Show themed confirmation dialog
@@ -332,6 +431,66 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.timer, color: Colors.orangeAccent),
+                const SizedBox(width: 8),
+                Text("${widget.receta.tiempoMinutos} min"),
+              ],
+            ),
+            const Divider(height: 32),
+            const Text(
+              "Ingredientes por comprar:",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...widget.receta.ingredientes.map((ing) {
+              return CheckboxListTile(
+                title: Text(ing),
+                value: _ingredientesSeleccionados[ing] ?? false,
+                onChanged: (bool? value) async {
+                  setState(() {
+                    _ingredientesSeleccionados[ing] = value ?? false;
+                    _ingredientesFaltantes[ing] = value ?? false;
+                  });
+                  await _guardarIngredientesFaltantes();
+                  await _actualizarCarrito(ing, value ?? false);
+                },
+              );
+            }).toList(),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () => _marcarTodos(true),
+                  child: const Text("Marcar todos"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _marcarTodos(false),
+                  child: const Text("Marcar ninguno"),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            const Text(
+              "Descripción:",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(widget.receta.descripcion),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PasosRecetaScreen(receta: widget.receta),
           ),
         )
         // Animate the main comment card
@@ -605,6 +764,33 @@ class _DetalleRecetaState extends State<DetalleReceta> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _mostrarIngredientesFaltantes(BuildContext context) {
+    List<String> faltantes = _ingredientesFaltantes.entries
+        .where((entry) => entry.value)
+        .map((entry) => entry.key)
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Ingredientes faltantes - ${widget.receta.nombre}'),
+        content: faltantes.isEmpty
+            ? const Text('¡No te falta nada para esta receta!')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: faltantes.map((ing) => Text('- $ing')).toList(),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
     );
   }

@@ -20,7 +20,7 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
   @override
   void initState() {
     super.initState();
-    _loadUserIdAndFavorites();
+    _loadUserId();
   }
 
   Future<void> _loadUserIdAndFavorites() async {

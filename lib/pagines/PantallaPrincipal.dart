@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:recetas360/components/CarritoRestante.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
+import '../widgetsutilizados/burbujaestilo.dart';// Asegúrate de importar esta pantalla
 import 'package:recetas360/widgetsutilizados/burbujaestilo.dart';
 // Asegúrate que la ruta a Burbujawidget sea correcta según tu estructura
 
@@ -103,6 +105,31 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
               icon: const Icon(Icons.settings_outlined),
               tooltip: "Ajustes",
               onPressed: () => _navigateTo(const PaginaAjustes())),
+            icon: const Icon(Icons.shopping_cart, color: Colors.white),
+            iconSize: 32,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CarritoFaltantes()),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
+          IconButton(
+            iconSize: 32,
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PaginaAjustes(),
+                ),
+              ).then((_) {
+                _restartAnimation();
+              });
+            },
+          ),
         ],
       ),
       body: Column(
@@ -225,3 +252,4 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     return bubbles;
   }
 }
+

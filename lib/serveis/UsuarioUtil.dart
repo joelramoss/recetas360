@@ -1,4 +1,3 @@
-// usuario_util.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -9,6 +8,11 @@ class UsuarioUtil {
   /// Obtiene el UID del usuario actual autenticado.
   String? getUidUsuarioActual() {
     return _auth.currentUser?.uid;
+  }
+
+  /// Obtiene el correo del usuario actual autenticado.
+  String? getCorreoUsuarioActual() {
+    return _auth.currentUser?.email;
   }
 
   /// Obtiene el nombre del usuario actual desde Firestore.

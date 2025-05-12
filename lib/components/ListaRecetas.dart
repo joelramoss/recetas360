@@ -361,6 +361,18 @@ class _ListaRecetasState extends State<ListaRecetas> {
                       data['urlImagen'] == null) {
                     return const SizedBox.shrink();
                   }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(child: Text("No se encontraron recetas."));
+                  }
+                  final recetasDocs = snapshot.data!.docs;
+                  // Convertir los documentos en objetos Receta, incluyendo el ID.
+                  final List<Receta> recetas = recetasDocs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    data['id'] = doc.id;
+                    // Inicializamos el estado de favoritos con el valor de isFavorite
+                    _favorites[doc.id] = data['isFavorite'] ?? false;
+                    return Receta.fromFirestore(data);
+                  }).toList();
                   final receta = Receta.fromFirestore(data, doc.id);
                   final bool isFavorite = favoriteIds.contains(receta.id);
                   const double imageSize = 80.0;
@@ -456,6 +468,35 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                 ],
                               ),
                             ),
+                          ),
+                        );
+                      }
+
+                      final receta = recetas[index];
+                      // Usamos el valor de _favorites para determinar si es favorita
+                      final isFavorite = _favorites[receta.id] ?? false;
+
+                      // Construimos la tarjeta de cada receta con un layout personalizado
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DetalleReceta(receta: receta),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          color: isFavorite ? Colors.pink.shade100 : Colors.white, // Cambia el color de fondo según el estado
+                          elevation: 4,
+                          margin: EdgeInsets.only(bottom: cardPadding),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(cardPadding),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                             // Action Icons
                             Column(
                               mainAxisAlignment: MainAxisAlignment.start,
@@ -525,6 +566,80 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                         imageUrl:
                                             Uri.tryParse(receta.urlImagen),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                // Íconos de acciones (favorito, editar, eliminar) en una columna
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                                        color: isFavorite ? Colors.red : Colors.grey,
+                                      ),
+                                      onPressed: () async {
+                                        final newValue = !isFavorite;
+                                        setState(() {
+                                          _favorites[receta.id] = newValue;
+                                        });
+                                        try {
+                                          // Actualizamos el campo isFavorite directamente en la colección recetas
+                                          await FirebaseFirestore.instance
+                                              .collection('recetas')
+                                              .doc(receta.id)
+                                              .update({'isFavorite': newValue});
+                                        } catch (e) {
+                                          // Si algo sale mal, revertimos el estado de los favoritos
+                                          setState(() {
+                                            _favorites[receta.id] = isFavorite;
+                                          });
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text("Error al actualizar favorito: $e")),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, color: Colors.blue),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => EditarReceta(receta: receta),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () async {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Eliminar receta"),
+                                            content: const Text("¿Estás seguro que deseas eliminar esta receta?"),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context, false),
+                                                child: const Text("Cancelar"),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context, true),
+                                                child: const Text("Eliminar"),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          await FirebaseFirestore.instance
+                                              .collection('recetas')
+                                              .doc(receta.id)
+                                              .delete();
+                                        }
+                                      },
+                                    ),
+                                  ],
                                     );
 
                                     try {
