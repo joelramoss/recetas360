@@ -123,15 +123,14 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 final double boxWidth = constraints.maxWidth;
                 final double boxHeight = constraints.maxHeight;
                 final double centerX = boxWidth / 2;
-                final double centerY =
-                    boxHeight / 2 * 0.95; // Ligeramente más arriba
+                final double centerY = boxHeight / 2; // Usar el centro geométrico
                 final double minSide = math.min(boxWidth, boxHeight);
                 final double radius =
                     minSide * 0.35; // Radio del círculo de burbujas
                 final double outerBubbleSize =
-                    minSide * 0.25; // Tamaño burbujas exteriores
+                    minSide * 0.29; // Tamaño burbujas exteriores
                 final double centerBubbleSize =
-                    minSide * 0.30; // Tamaño burbuja central
+                    minSide * 0.33; // Tamaño burbuja central
 
                 return SizedBox(
                   width: constraints.maxWidth,

@@ -34,15 +34,15 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
   // TODO: Añade URLs de imágenes relevantes para cada gastronomía si lo deseas
   final Map<String, String?> subcategoriasImagenes = {
     "Mediterranea":
-        "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80", // Ejemplo
+        "assets/images/mediterranea.png",
     "Asiatica":
-        "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80", // Ejemplo
+        "assets/images/asiatica.png", 
     "Americana":
-        "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80", // Ejemplo
+        "assets/images/americana.png", 
     "Africana":
-        "https://images.unsplash.com/photo-1534790566855-4cb788d389ec?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80", // Ejemplo
+        "assets/images/africana.png", 
     "Oceanica":
-        "https://images.unsplash.com/photo-1506084868230-bb9d95c24759?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80", // Ejemplo
+        "assets/images/oceanica.png",
   };
 
   late AnimationController _controller;
@@ -165,9 +165,9 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
                 final double minSide = math.min(boxWidth, boxHeight);
                 final double radius = minSide * 0.35; // Radio exterior
                 final double outerBubbleSize =
-                    minSide * 0.28; // Tamaño burbujas gastronomía
+                    minSide * 0.32; // Tamaño burbujas gastronomía
                 final double centerBubbleSize =
-                    minSide * 0.30; // Tamaño burbuja categoría central
+                    minSide * 0.33; // Tamaño burbuja categoría central
 
                 // --- DEBUG: Añade un contenedor con borde ---
                 return SizedBox(
@@ -295,8 +295,7 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
           child: Burbujawidget(
             text: subcat,
             size: bubbleSize,
-            imageUrl: imageUrl,
-            fontSizeMultiplier: 0.09, // <-- ADJUST THIS VALUE (e.g., 0.10, 0.09)
+            imageUrl: imageUrl,            
             onTap: () {
               print(
                   "Navegando con Categoria: ${widget.tipoAlimento}, Gastronomia: $subcat");
