@@ -7,347 +7,616 @@ import 'package:recetas360/components/editarReceta.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallacrearReceta.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:recetas360/pagines/RecetasFavoritas.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+
+// Current User's Login: joelramoss
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:49:18
 
 class ListaRecetas extends StatefulWidget {
   final String mainCategory;
   final String subCategory;
 
   const ListaRecetas({
-    Key? key,
+    super.key,
     required this.mainCategory,
     required this.subCategory,
-  }) : super(key: key);
+  });
 
   @override
   _ListaRecetasState createState() => _ListaRecetasState();
 }
 
 class _ListaRecetasState extends State<ListaRecetas> {
-  // Mapa local para almacenar el estado favorito de cada receta, basado en el doc.id.
-  final Map<String, bool> _favorites = {};
+  // --- Helper: Shimmer Placeholder Card ---
+  Widget _buildShimmerCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final shimmerBase = colorScheme.surfaceContainerHighest;
+    final shimmerHighlight =
+        colorScheme.surfaceContainerHighest.withOpacity(0.5);
+    const double imageSize = 80.0;
+    const double cardPadding = 12.0;
+    const double internalPadding = 16.0;
 
-  @override
-  Widget build(BuildContext context) {
-    // Dimensiones de la pantalla para un layout responsivo.
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double imageSize = screenWidth * 0.20;    // La imagen ocupará ~20% del ancho.
-    final double starSize = screenWidth * 0.06;     // Tamaño relativo para las estrellas.
-    final double cardPadding = screenWidth * 0.04;  // Padding y márgenes relativos.
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.orangeAccent,
-        actions: [
-          // Agregar botón de historial
-          IconButton(
-            icon: const Icon(Icons.history, color: Colors.white),
-            iconSize: 32,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const HistorialRecetas(),
+    return Shimmer.fromColors(
+      baseColor: shimmerBase,
+      highlightColor: shimmerHighlight,
+      child: Card(
+        elevation: 1,
+        margin: const EdgeInsets.only(bottom: 16.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(cardPadding),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: imageSize,
+                height: imageSize,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              );
-            },
-          ),
-          IconButton(
-            iconSize: 32.0,
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PaginaAjustes(),
+              ),
+              const SizedBox(width: internalPadding),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                        height: 16,
+                        width: double.infinity,
+                        color: Colors.white,
+                        margin: const EdgeInsets.only(bottom: 8)),
+                    Container(
+                        height: 14,
+                        width: 100,
+                        color: Colors.white,
+                        margin: const EdgeInsets.only(bottom: 8)),
+                    Container(height: 14, width: 150, color: Colors.white),
+                  ],
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Container(
-        // Fondo degradado
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.orangeAccent,
-              Colors.pink.shade100,
+              ),
+              Container(
+                  width: 24,
+                  height: 80,
+                  color: Colors.white,
+                  margin: const EdgeInsets.only(left: 8)),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // --- Helper: Empty State Widget ---
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Encabezado
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: Center(
-                child: Text(
-                  "Recetas: ${widget.mainCategory} - ${widget.subCategory}",
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black45,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+            Icon(Icons.ramen_dining_outlined,
+                    size: 60, color: colorScheme.secondary)
+                .animate()
+                .scale(
+                    delay: 100.ms, duration: 400.ms, curve: Curves.elasticOut),
+            const SizedBox(height: 16),
+            Text(
+              "No hay recetas en esta categoría aún.",
+              style:
+                  textTheme.titleMedium?.copyWith(color: colorScheme.secondary),
+              textAlign: TextAlign.center,
+            )
+                .animate()
+                .fadeIn(delay: 200.ms, duration: 400.ms)
+                .slideY(
+                    begin: 0.2,
+                    delay: 200.ms,
+                    duration: 400.ms,
+                    curve: Curves.easeOut),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const CrearRecetaScreen())),
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              label: const Text("Crear la Primera Receta"),
+            )
+                .animate()
+                .fadeIn(delay: 300.ms, duration: 400.ms)
+                .slideY(
+                    begin: 0.5,
+                    delay: 300.ms,
+                    duration: 400.ms,
+                    curve: Curves.easeOut),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Helper: Error State Widget ---
+  Widget _buildErrorState(BuildContext context, Object? error) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    print("Error loading recipes/favorites: $error");
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                size: 60, color: colorScheme.error),
+            const SizedBox(height: 16),
+            Text(
+              "Error al cargar las recetas.",
+              style: textTheme.titleMedium?.copyWith(color: colorScheme.error),
+              textAlign: TextAlign.center,
             ),
-            // Lista de recetas con StreamBuilder
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('recetas')
-                    .where('categoria', isEqualTo: widget.mainCategory)
-                    .where('gastronomia', isEqualTo: widget.subCategory)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text("No se encontraron recetas."));
-                  }
-                  final recetasDocs = snapshot.data!.docs;
-                  // Convertir los documentos en objetos Receta, incluyendo el ID.
-                  final List<Receta> recetas = recetasDocs.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    data['id'] = doc.id;
-                    // Si el campo 'isFavorite' no existe, se asume false.
-                    _favorites[doc.id] = data['isFavorite'] ?? false;
-                    return Receta.fromFirestore(data);
-                  }).toList();
-
-                  return ListView.builder(
-                    padding: EdgeInsets.all(cardPadding),
-                    itemCount: recetas.length + 1,
-                    itemBuilder: (context, index) {
-                      // Al llegar al final, mostramos el botón para crear receta
-                      if (index == recetas.length) {
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            top: cardPadding,
-                            bottom: cardPadding * 2,
-                          ),
-                          child: Center(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orangeAccent,
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: cardPadding * 2,
-                                  vertical: cardPadding,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const CrearRecetaScreen(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.add),
-                              label: const Text(
-                                "Crear Receta",
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final receta = recetas[index];
-                      final isFavorite = _favorites[receta.id] ?? false;
-
-                      // Construimos la tarjeta de cada receta con un layout personalizado
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DetalleReceta(receta: receta),
-                            ),
-                          );
-                        },
-                        child: Card(
-                          color: isFavorite ? Colors.pink.shade100 : Colors.white,
-                          elevation: 4,
-                          margin: EdgeInsets.only(bottom: cardPadding),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(cardPadding),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Imagen
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    receta.urlImagen,
-                                    width: imageSize,
-                                    height: imageSize,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        width: imageSize,
-                                        height: imageSize,
-                                        color: Colors.grey.shade300,
-                                        child: const Icon(Icons.image_not_supported),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                SizedBox(width: cardPadding),
-                                // Texto (nombre, tiempo, estrellas) en una columna expandida
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        receta.nombre,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "Tiempo: ${receta.tiempoMinutos} min",
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: List.generate(5, (i) {
-                                          return Icon(
-                                            i < receta.calificacion
-                                                ? Icons.star
-                                                : Icons.star_border,
-                                            color: Colors.orangeAccent,
-                                            size: starSize,
-                                          );
-                                        }),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // Íconos de acciones (favorito, editar, eliminar) en una columna
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                                        color: isFavorite ? Colors.red : Colors.grey,
-                                      ),
-                                      onPressed: () async {
-                                        final newValue = !isFavorite;
-                                        setState(() {
-                                          _favorites[receta.id] = newValue;
-                                        });
-                                        try {
-                                          final userId = FirebaseAuth.instance.currentUser?.uid; // Obtén el ID del usuario actual
-
-                                          if (userId != null) {
-                                            if (newValue) {
-                                              // Si el usuario marca como favorito, añadimos a la colección de favoritos
-                                              await FirebaseFirestore.instance
-                                                  .collection('usuarios')
-                                                  .doc(userId)
-                                                  .collection('favoritos')
-                                                  .doc(receta.id)
-                                                  .set({'recetaId': receta.id});
-                                            } else {
-                                              // Si el usuario desmarca como favorito, eliminamos de la colección de favoritos
-                                              await FirebaseFirestore.instance
-                                                  .collection('usuarios')
-                                                  .doc(userId)
-                                                  .collection('favoritos')
-                                                  .doc(receta.id)
-                                                  .delete();
-                                            }
-                                          }
-                                        } catch (e) {
-                                          // Si algo sale mal, revertimos el estado de los favoritos
-                                          setState(() {
-                                            _favorites[receta.id] = isFavorite;
-                                          });
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text("Error al actualizar favorito: $e")),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.blue),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => EditarReceta(receta: receta),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () async {
-                                        final confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text("Eliminar receta"),
-                                            content: const Text("¿Estás seguro que deseas eliminar esta receta?"),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context, false),
-                                                child: const Text("Cancelar"),
-                                              ),
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context, true),
-                                                child: const Text("Eliminar"),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (confirm == true) {
-                                          await FirebaseFirestore.instance
-                                              .collection('recetas')
-                                              .doc(receta.id)
-                                              .delete();
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+            const SizedBox(height: 8),
+            Text(
+              "Inténtalo de nuevo más tarde.",
+              style: textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onErrorContainer),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
     );
   }
+
+  // --- Helper: Delete Confirmation Dialog ---
+  Future<bool?> _showDeleteConfirmationDialog(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Eliminar Receta"),
+        content: const Text("¿Estás seguro? Esta acción no se puede deshacer."),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancelar")),
+          TextButton(
+              style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.error),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Eliminar")),
+        ],
+      ),
+    );
+  }
+
+  // --- Helper: Favorite Update (uses 'favoritos' subcollection) ---
+  Future<void> _updateFavorite(BuildContext context, String userId,
+      String recipeId, bool isCurrentlyFavorite) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final favRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .collection('favoritos')
+        .doc(recipeId);
+    try {
+      if (!isCurrentlyFavorite) {
+        await favRef.set({'addedAt': FieldValue.serverTimestamp()});
+      } else {
+        await favRef.delete();
+      }
+    } catch (e) {
+      print("Error updating favorite: $e");
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al guardar favorito.",
+              style: TextStyle(color: colorScheme.onError)),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  // --- Helper: Delete Recipe ---
+  Future<void> _deleteRecipe(BuildContext context, String recipeId) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    try {
+      await FirebaseFirestore.instance
+          .collection('recetas')
+          .doc(recipeId)
+          .delete();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Receta eliminada.")));
+    } catch (e) {
+      print("Error deleting recipe: $e");
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al eliminar la receta.",
+              style: TextStyle(color: colorScheme.onError)),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  // --- Helper: Share Recipe ---
+  Future<void> _shareRecipe(BuildContext context, Receta receta) async {
+    final String recipeName = receta.nombre;
+    final String recipeId = receta.id;
+    // Ensure this is your desired deep link structure
+    final String deepLinkUrl = "https://recetas360.com/receta?id=$recipeId";
+
+    try {
+      final DynamicLinkParameters parameters = DynamicLinkParameters(
+        uriPrefix: 'https://recetas360.page.link', // Your Firebase Dynamic Links prefix
+        link: Uri.parse(deepLinkUrl),
+        androidParameters: const AndroidParameters(
+          packageName: 'com.example.recetas360', // Your Android package name
+          minimumVersion: 0,
+        ),
+        iosParameters: const IOSParameters(
+          bundleId: 'com.example.recetas360', // Your iOS bundle ID
+          minimumVersion: '0',
+        ),
+        socialMetaTagParameters: SocialMetaTagParameters(
+          title: '¡Mira esta receta: $recipeName!',
+          description: 'Descubre cómo preparar $recipeName en Recetas360.',
+          imageUrl: Uri.tryParse(receta.urlImagen),
+        ),
+      );
+      final ShortDynamicLink shortLink =
+          await FirebaseDynamicLinks.instance.buildShortLink(parameters);
+      final Uri shortUrl = shortLink.shortUrl;
+      Share.share(
+        '¡Echa un vistazo a esta receta: $recipeName! ${shortUrl.toString()}',
+        subject: 'Receta: $recipeName',
+      );
+    } catch (e) {
+      print("Error al crear el enlace dinámico: $e");
+      // Fallback to simple text share
+      final String shareText =
+          "¡Mira esta deliciosa receta: $recipeName!\n\n"
+          "Tiempo: ${receta.tiempoMinutos} min\n"
+          "Calificación: ${receta.calificacion} estrellas\n\n"
+          "Encuéntrala en Recetas360 (o tu app)."; // Generic app mention
+      Share.share(shareText, subject: 'Receta: $recipeName');
+    }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    const double cardPadding = 16.0;
+    const double starSize = 18.0;
+    const double imageSize = 80.0;
+
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: userId != null
+          ? FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(userId)
+              .collection('favoritos')
+              .snapshots()
+          : Stream<QuerySnapshot<Map<String, dynamic>>>.value(
+              QuerySnapshotData([], {})), // Empty snapshot for logged-out users
+      builder: (context, favoritesSnapshot) {
+        if (userId != null &&
+            favoritesSnapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: _buildAppBar(context, textTheme),
+            body: ListView.builder(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: cardPadding, vertical: cardPadding),
+              itemCount: 5,
+              itemBuilder: (context, index) => _buildShimmerCard(context),
+            ),
+          );
+        }
+        if (favoritesSnapshot.hasError) {
+          return Scaffold(
+            appBar: _buildAppBar(context, textTheme),
+            body: _buildErrorState(context, favoritesSnapshot.error),
+          );
+        }
+
+        final Set<String> favoriteIds =
+            userId == null || !favoritesSnapshot.hasData
+                ? <String>{}
+                : favoritesSnapshot.data!.docs.map((doc) => doc.id).toSet();
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('recetas')
+              .where('categoria', isEqualTo: widget.mainCategory)
+              .where('gastronomia', isEqualTo: widget.subCategory)
+              .snapshots(),
+          builder: (context, recipeSnapshot) {
+            Widget body;
+            bool recipesExist = false;
+
+            if (recipeSnapshot.connectionState == ConnectionState.waiting) {
+              body = ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: cardPadding, vertical: cardPadding),
+                itemCount: 5,
+                itemBuilder: (context, index) => _buildShimmerCard(context),
+              );
+            } else if (recipeSnapshot.hasError) {
+              body = _buildErrorState(context, recipeSnapshot.error);
+            } else if (!recipeSnapshot.hasData ||
+                recipeSnapshot.data!.docs.isEmpty) {
+              body = _buildEmptyState(context);
+            } else {
+              recipesExist = true;
+              final recetasDocs = recipeSnapshot.data!.docs;
+              body = ListView.builder(
+                padding: EdgeInsets.only(
+                  left: cardPadding,
+                  right: cardPadding,
+                  top: cardPadding,
+                  bottom: cardPadding + (recipesExist ? 72 : 0), // Space for FAB
+                ),
+                itemCount: recetasDocs.length,
+                itemBuilder: (context, index) {
+                  final doc = recetasDocs[index];
+                  final data = doc.data() as Map<String, dynamic>?;
+
+                  if (data == null ||
+                      data['nombre'] == null ||
+                      data['urlImagen'] == null) {
+                    return const SizedBox.shrink(); // Skip invalid item
+                  }
+
+                  final receta = Receta.fromFirestore(data, doc.id);
+                  final bool isFavorite = favoriteIds.contains(receta.id);
+
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => DetalleReceta(receta: receta))),
+                    child: Card(
+                      elevation: 1,
+                      margin: const EdgeInsets.only(bottom: cardPadding),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      clipBehavior: Clip.antiAlias,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Hero(
+                              tag: 'recipe_image_${receta.id}',
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  receta.urlImagen,
+                                  width: imageSize,
+                                  height: imageSize,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                    width: imageSize,
+                                    height: imageSize,
+                                    decoration: BoxDecoration(
+                                        color:
+                                            colorScheme.surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(8)),
+                                    child: Icon(Icons.broken_image_outlined,
+                                        color: colorScheme.onSurfaceVariant,
+                                        size: 32),
+                                  ),
+                                  loadingBuilder: (context, child,
+                                          loadingProgress) =>
+                                      loadingProgress == null
+                                          ? child
+                                          : SizedBox(
+                                              width: imageSize,
+                                              height: imageSize,
+                                              child: Shimmer.fromColors(
+                                                baseColor: colorScheme
+                                                    .surfaceContainerHighest,
+                                                highlightColor: colorScheme
+                                                    .surfaceContainerHighest
+                                                    .withOpacity(0.5),
+                                                child: Container(
+                                                    decoration: BoxDecoration(
+                                                        color: Colors.white,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8))),
+                                              ),
+                                            ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(receta.nombre,
+                                      style: textTheme.titleMedium,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  Text("Tiempo: ${receta.tiempoMinutos} min",
+                                      style: textTheme.bodyMedium?.copyWith(
+                                          color: colorScheme.onSurfaceVariant)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: List.generate(
+                                        5,
+                                        (i) => Icon(
+                                              i < receta.calificacion
+                                                  ? Icons.star_rounded
+                                                  : Icons.star_border_rounded,
+                                              color: colorScheme.primary,
+                                              size: starSize,
+                                            )),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Action Icons Column
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min, // Important for Row layout
+                              children: [
+                                IconButton(
+                                  icon: Icon(isFavorite
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded),
+                                  color: isFavorite
+                                      ? colorScheme.primary
+                                      : colorScheme.outline,
+                                  tooltip: isFavorite
+                                      ? "Quitar favorito"
+                                      : "Añadir favorito",
+                                  onPressed: userId == null
+                                      ? null
+                                      : () => _updateFavorite(context, userId,
+                                          receta.id, isFavorite),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_note_rounded),
+                                  color: colorScheme.secondary,
+                                  tooltip: "Editar",
+                                  onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              EditarReceta(receta: receta))),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.share_rounded),
+                                  color: colorScheme.tertiary,
+                                  tooltip: "Compartir receta",
+                                  onPressed: () => _shareRecipe(context, receta),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_forever_rounded),
+                                  color: colorScheme.error,
+                                  tooltip: "Eliminar",
+                                  onPressed: () async {
+                                    final confirm =
+                                        await _showDeleteConfirmationDialog(
+                                            context);
+                                    if (confirm == true) {
+                                      _deleteRecipe(context, receta.id);
+                                    }
+                                  },
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: (50 * (index % 10)).ms)
+                      .slideY(
+                          begin: 0.1,
+                          duration: 300.ms,
+                          delay: (50 * (index % 10)).ms,
+                          curve: Curves.easeOut);
+                },
+              );
+            }
+
+            return Scaffold(
+              appBar: _buildAppBar(context, textTheme),
+              body: body,
+              floatingActionButton: recipesExist
+                  ? FloatingActionButton.extended(
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const CrearRecetaScreen())),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text("Crear Receta"),
+                    ).animate().slideY(
+                      begin: 2,
+                      delay: 500.ms,
+                      duration: 500.ms,
+                      curve: Curves.easeOut)
+                  : null,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  AppBar _buildAppBar(BuildContext context, TextTheme textTheme) {
+    return AppBar(
+      title: Text("${widget.mainCategory} / ${widget.subCategory}",
+          style: textTheme.titleMedium),
+      actions: [
+        IconButton(
+            icon: const Icon(Icons.favorite_border_outlined),
+            tooltip: "Favoritos",
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const RecetasFavoritas()))),
+        IconButton(
+          icon: const Icon(Icons.history_rounded),
+          tooltip: "Historial",
+          onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const HistorialRecetas())),
+        ),
+        // Consider adding CarritoRestante if needed in this screen's AppBar
+        IconButton(
+          icon: const Icon(Icons.settings_rounded),
+          tooltip: "Ajustes",
+          onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const PaginaAjustes())),
+        ),
+      ],
+    );
+  }
+}
+
+// Helper class for QuerySnapshot.empty() with correct type
+class QuerySnapshotData<T extends Object?> implements QuerySnapshot<T> {
+  @override
+  final List<QueryDocumentSnapshot<T>> docs;
+  @override
+  final List<DocumentChange<T>> docChanges;
+  @override
+  final SnapshotMetadata metadata;
+  @override
+  final int size;
+
+  QuerySnapshotData(this.docs, Map<String, dynamic> metadataMap)
+      : docChanges = const [],
+        metadata = const SnapshotMetadataData(false, false),
+        size = docs.length;
+}
+
+class SnapshotMetadataData implements SnapshotMetadata {
+  @override
+  final bool hasPendingWrites;
+  @override
+  final bool isFromCache;
+
+  const SnapshotMetadataData(this.hasPendingWrites, this.isFromCache);
 }
