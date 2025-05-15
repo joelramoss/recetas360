@@ -1,8 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/components/agregarReceta.dart';
 import 'Receta.dart';
 import 'nutritionalifno.dart'; // Donde tienes la clase NutritionalInfo y getRecipeNutritionalInfo
-import 'package:recetas360/components/apiservice.dart'; // Aquí se encuentra getRecipeNutritionalInfo
+// Aquí se encuentra getRecipeNutritionalInfo
 
 
 Future<void> crearNuevaReceta() async {

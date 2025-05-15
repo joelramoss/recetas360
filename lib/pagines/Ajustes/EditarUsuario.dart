@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_animate/flutter_animate.dart'; // Import animate
+
+// Current User's Login: joelramoss
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:45:58
 
 class Editarusuario extends StatefulWidget {
-  const Editarusuario({Key? key}) : super(key: key);
+  const Editarusuario({super.key});
 
   @override
   _EditarusuarioState createState() => _EditarusuarioState();
@@ -12,353 +16,283 @@ class Editarusuario extends StatefulWidget {
 class _EditarusuarioState extends State<Editarusuario> {
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _currentPasswordController = TextEditingController();
-  
-  bool _isLoading = false;
-  bool _showCurrentPassword = false;
-  
+  final _formKey = GlobalKey<FormState>(); // Add form key
+
+  bool _isLoading = true; // Start loading initially
+  bool _isSaving = false; // Separate flag for saving state
+
+  String _userInitial = "?"; // Store user initial
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
   }
-  
-  Future<void> _loadUserData() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // Obtener el usuario actual de Firebase Auth
-      final User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        // Establecer el email actual
-        _emailController.text = currentUser.email ?? '';
-        
-        // Buscar datos adicionales en Firestore
-        final DocumentSnapshot userData = await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(currentUser.uid)
-            .get();
-        
-        if (userData.exists && userData.data() != null) {
-          final data = userData.data() as Map<String, dynamic>;
-          setState(() {
-            _nombreController.text = data['nombre'] ?? '';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar datos: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-  
-  Future<void> _updateUserData() async {
-    if (_nombreController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El nombre no puede estar vacío')),
-      );
-      return;
-    }
-    
-    // Si quiere cambiar la contraseña pero no proporciona la actual
-    if (_passwordController.text.isNotEmpty && _currentPasswordController.text.isEmpty) {
-      setState(() {
-        _showCurrentPassword = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Introduce tu contraseña actual para confirmar cambios')),
-      );
-      return;
-    }
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // Obtener el usuario actual
-      final User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        throw Exception("No hay usuario autenticado");
-      }
-      
-      // 1. Primero actualizar Firestore (operación menos sensible)
-      await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(currentUser.uid)
-          .update({
-            'nombre': _nombreController.text,
-          });
-      
-      // 2. Actualizar nombre de usuario en Auth
-      await currentUser.updateDisplayName(_nombreController.text);
-      
-      // 3. Si hay cambio de contraseña, reautenticar y cambiarla
-      if (_passwordController.text.isNotEmpty && _passwordController.text.length >= 6) {
-        // Reautenticar usuario con su contraseña actual
-        final credential = EmailAuthProvider.credential(
-          email: currentUser.email!, 
-          password: _currentPasswordController.text
-        );
-        
-        await currentUser.reauthenticateWithCredential(credential);
-        await currentUser.updatePassword(_passwordController.text);
-      }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Datos actualizados correctamente!')),
-      );
-      
-      Navigator.pop(context);
-    } catch (e) {
-      String errorMsg = 'Error al actualizar datos';
-      
-      // Mensajes de error más específicos
-      if (e is FirebaseAuthException) {
-        switch (e.code) {
-          case 'wrong-password':
-            errorMsg = 'La contraseña actual es incorrecta';
-            break;
-          case 'requires-recent-login':
-            errorMsg = 'Por seguridad, inicia sesión nuevamente y vuelve a intentarlo';
-            break;
-          case 'weak-password':
-            errorMsg = 'La contraseña debe tener al menos 6 caracteres';
-            break;
-          default:
-            errorMsg = 'Error de autenticación: ${e.message}';
-        }
-      }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg)),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.orangeAccent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          "Editar Usuario",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.orangeAccent,
-              Colors.pink.shade100,
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.white))
-            : SafeArea(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: SingleChildScrollView(
-                          child: Container(
-                            width: 320,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 4,
-                                  offset: Offset(2, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Icono de usuario
-                                const CircleAvatar(
-                                  radius: 50,
-                                  backgroundColor: Colors.orangeAccent,
-                                  child: Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                
-                                // Campo para "Nombre"
-                                TextField(
-                                  controller: _nombreController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Nombre',
-                                    labelStyle: const TextStyle(color: Colors.black),
-                                    prefixIcon: const Icon(
-                                      Icons.person,
-                                      color: Colors.black,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.black.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 15),
-                                
-                                // Campo para "Email" (solo lectura)
-                                TextField(
-                                  controller: _emailController,
-                                  enabled: false,
-                                  decoration: InputDecoration(
-                                    labelText: 'Email',
-                                    labelStyle: TextStyle(color: Colors.grey),
-                                    prefixIcon: const Icon(
-                                      Icons.email,
-                                      color: Colors.grey,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.black.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.grey.shade100,
-                                  ),
-                                ),
-                                const SizedBox(height: 15),
-                                
-                                // Campo para nueva contraseña
-                                TextField(
-                                  controller: _passwordController,
-                                  obscureText: true,
-                                  decoration: InputDecoration(
-                                    labelText: 'Nueva contraseña (opcional)',
-                                    labelStyle: const TextStyle(color: Colors.black),
-                                    prefixIcon: const Icon(
-                                      Icons.lock,
-                                      color: Colors.black,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.black.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    helperText: 'Mínimo 6 caracteres',
-                                  ),
-                                  onChanged: (value) {
-                                    // Mostrar campo de contraseña actual si comienza a escribir
-                                    if (value.isNotEmpty && !_showCurrentPassword) {
-                                      setState(() {
-                                        _showCurrentPassword = true;
-                                      });
-                                    }
-                                  },
-                                ),
-                                if (_showCurrentPassword) ...[
-                                  const SizedBox(height: 15),
-                                  // Campo para contraseña actual (requerido para cambios sensibles)
-                                  TextField(
-                                    controller: _currentPasswordController,
-                                    obscureText: true,
-                                    decoration: InputDecoration(
-                                      labelText: 'Contraseña actual',
-                                      labelStyle: const TextStyle(color: Colors.black),
-                                      prefixIcon: const Icon(
-                                        Icons.key,
-                                        color: Colors.black,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: Colors.black.withOpacity(0.3),
-                                        ),
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 20),
-                                
-                                // Botón de guardar cambios
-                                ElevatedButton(
-                                  onPressed: _updateUserData,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10, horizontal: 40),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Guardar cambios',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-      ),
-    );
-  }
-  
   @override
   void dispose() {
     _nombreController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _currentPasswordController.dispose();
     super.dispose();
+  }
+
+  // --- Load User Data ---
+  Future<void> _loadUserData() async {
+    // No need to set _isLoading = true here, already set in initial state
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      // Handle user not logged in case
+       if (mounted) {
+         setState(() => _isLoading = false);
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('No se pudo encontrar el usuario.', style: TextStyle(color: Theme.of(context).colorScheme.onError)), backgroundColor: Theme.of(context).colorScheme.error),
+         );
+         // Optionally pop the screen
+         // Navigator.pop(context);
+       }
+      return;
+    }
+
+    try {
+      // Set email and initial from Auth
+      _emailController.text = currentUser.email ?? '';
+      _userInitial = currentUser.displayName?.substring(0, 1).toUpperCase() ?? currentUser.email?.substring(0, 1).toUpperCase() ?? "?";
+
+
+      // Fetch additional data from Firestore
+      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        _nombreController.text = data['nombre'] ?? currentUser.displayName ?? ''; // Fallback to Auth display name
+        // Update initial if name exists in Firestore
+        if (_nombreController.text.isNotEmpty) {
+           _userInitial = _nombreController.text.substring(0, 1).toUpperCase();
+        }
+      } else {
+         // If no Firestore data, use Auth display name if available
+         _nombreController.text = currentUser.displayName ?? '';
+      }
+
+    } catch (e) {
+      print("Error loading user data: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar datos: ${e.toString()}', style: TextStyle(color: Theme.of(context).colorScheme.onError)), backgroundColor: Theme.of(context).colorScheme.error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // --- Update User Data ---
+  Future<void> _updateUserData() async {
+    if (_isSaving) return;
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+
+    setState(() => _isSaving = true);
+    final newName = _nombreController.text.trim();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) throw Exception("Usuario no autenticado.");
+
+      // --- Update Firestore (if name changed) ---
+      // Only update if the name actually changed to avoid unnecessary writes
+      final currentFirestoreData = await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).get();
+      final currentFirestoreName = (currentFirestoreData.data())?['nombre'] as String?;
+
+      if (currentFirestoreName != newName) {
+         await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).set(
+            {'nombre': newName}, SetOptions(merge: true)); // Use set with merge to create if not exists
+      }
+
+
+      // --- Update Auth Display Name (if changed) ---
+      if (currentUser.displayName != newName) {
+         await currentUser.updateDisplayName(newName);
+         // Optional: Reload user data to reflect changes immediately in Auth state
+         // await currentUser.reload();
+      }
+
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Datos actualizados correctamente!')),
+      );
+      Navigator.pop(context); // Go back after saving
+
+    } catch (e) {
+       print("Error updating user data: $e");
+       if (!mounted) return;
+       String errorMsg = 'Error al actualizar datos.';
+       if (e is FirebaseAuthException) {
+         errorMsg = 'Error de autenticación: ${e.message ?? e.code}';
+       }
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(content: Text(errorMsg, style: TextStyle(color: colorScheme.onError)), backgroundColor: colorScheme.error),
+       );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+   // --- Send Password Reset ---
+   Future<void> _sendPasswordReset() async {
+     final email = _emailController.text.trim();
+     if (email.isEmpty) return; // Should not happen if loaded correctly
+
+     final colorScheme = Theme.of(context).colorScheme;
+
+     try {
+       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+       if (!mounted) return;
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(
+           content: Text('Enlace de restablecimiento enviado a tu correo'),
+           // backgroundColor: Colors.green, // Use default theme indication
+         ),
+       );
+     } catch (e) {
+       print("Error sending password reset email: $e");
+       if (!mounted) return;
+        String errorMsg = 'Error al enviar correo de restablecimiento.';
+       if (e is FirebaseAuthException) {
+         errorMsg = 'Error: ${e.message ?? e.code}';
+       }
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+           content: Text(errorMsg, style: TextStyle(color: colorScheme.onError)),
+           backgroundColor: colorScheme.error,
+         ),
+       );
+     }
+   }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Editar Perfil"),
+        // backgroundColor: colorScheme.surface, // Uses theme default
+      ),
+      // Removed Container with gradient
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator()) // Themed indicator
+          : SafeArea(
+              child: ListView( // Use ListView for better scrolling if content grows
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  Form( // Wrap form fields
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                         // --- User Avatar ---
+                         CircleAvatar(
+                          radius: 50,
+                          backgroundColor: colorScheme.primaryContainer,
+                          foregroundColor: colorScheme.onPrimaryContainer,
+                          child: Text(
+                            _userInitial, // Display initial loaded
+                            style: textTheme.headlineLarge?.copyWith(color: colorScheme.onPrimaryContainer),
+                          ),
+                        ).animate().fadeIn(delay: 100.ms).scale(),
+                        const SizedBox(height: 24),
+
+                        // --- Name Field ---
+                        TextFormField(
+                          controller: _nombreController,
+                          decoration: _inputDecoration( // Use helper
+                              context: context,
+                              label: 'Nombre',
+                              icon: Icons.person_outline_rounded),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'El nombre no puede estar vacío' : null,
+                           enabled: !_isSaving, // Disable while saving
+                           textCapitalization: TextCapitalization.words,
+                        ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.1),
+                        const SizedBox(height: 16),
+
+                        // --- Email Field (Read-only) ---
+                        TextFormField(
+                          controller: _emailController,
+                          enabled: false, // Always disabled
+                          style: TextStyle(color: colorScheme.onSurfaceVariant), // Dim text color
+                          decoration: _inputDecoration(
+                            context: context,
+                            label: 'Correo electrónico',
+                            icon: Icons.email_outlined,
+                          ).copyWith( // Customize disabled appearance
+                             fillColor: colorScheme.onSurface.withOpacity(0.04), // Slightly different background when disabled
+                             filled: true,
+                          ),
+                        ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.1),
+                        const SizedBox(height: 24),
+
+                        // --- Reset Password Button ---
+                         TextButton.icon(
+                          onPressed: _isSaving ? null : _sendPasswordReset, // Disable while saving
+                          icon: Icon(Icons.lock_reset_rounded, color: colorScheme.secondary),
+                          label: Text(
+                            'Restablecer contraseña por correo',
+                            style: TextStyle(color: colorScheme.secondary),
+                          ),
+                        ).animate().fadeIn(delay: 400.ms),
+                        const SizedBox(height: 32),
+
+                        // --- Save Button ---
+                        ElevatedButton(
+                          onPressed: _isSaving ? null : _updateUserData, // Disable while saving
+                           style: ElevatedButton.styleFrom(
+                             minimumSize: const Size(double.infinity, 50), // Make button wider
+                           ),
+                          child: _isSaving
+                              ? SizedBox( // Show progress indicator
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    color: colorScheme.onPrimary,
+                                  ),
+                                )
+                              : const Text('Guardar Cambios'),
+                        ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+   // --- Helper for Input Decoration (Using Theme) ---
+   InputDecoration _inputDecoration({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+     final theme = Theme.of(context);
+     return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 20),
+      suffixIcon: suffixIcon,
+      // Styles inherited from theme's inputDecorationTheme
+    );
   }
 }

@@ -1,58 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Opcional: para guardar más datos en Firestore
-import 'package:recetas360/pagines/PaginaLogin.dart';
-import 'package:recetas360/pagines/PantallaPrincipal.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart'; // Import Google Sign-In
+import 'package:recetas360/pagines/PaginaLogin.dart'; // Corrected import name
+import 'package:recetas360/pagines/PantallaPrincipal.dart'; // Corrected import name
+import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 
-/// OLA INFERIOR #1 (fondo rosa)
-class PinkWaveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    path.moveTo(0, size.height);
-    path.quadraticBezierTo(
-      size.width * 0.25, size.height * 0.80,
-      size.width * 0.50, size.height * 0.90,
-    );
-    path.quadraticBezierTo(
-      size.width * 0.75, size.height,
-      size.width, size.height * 0.70,
-    );
-    path.lineTo(size.width, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(PinkWaveClipper oldClipper) => false;
-}
-
-/// OLA INFERIOR #2 (encima, morada)
-class PurpleWaveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    path.moveTo(0, size.height * 0.95);
-    path.quadraticBezierTo(
-      size.width * 0.25, size.height * 0.75,
-      size.width * 0.50, size.height * 0.85,
-    );
-    path.quadraticBezierTo(
-      size.width * 0.75, size.height * 0.95,
-      size.width, size.height * 0.60,
-    );
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(PurpleWaveClipper oldClipper) => false;
-}
+// Current User's Login: joelramoss
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:38:21
 
 class PaginaRegistro extends StatefulWidget {
-  const PaginaRegistro({Key? key}) : super(key: key);
+  const PaginaRegistro({super.key});
 
   @override
   State<PaginaRegistro> createState() => _PaginaRegistroState();
@@ -61,22 +19,13 @@ class PaginaRegistro extends StatefulWidget {
 class _PaginaRegistroState extends State<PaginaRegistro> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  // Campo opcional para nombre u otro dato:
   final TextEditingController nameController = TextEditingController();
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  // Opcional: para guardar más datos en Firestore
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(); // Instance for Google Sign-In
 
-  bool rememberMe = false;
-
-  @override
-  void initState() {
-    super.initState();
-    emailController.addListener(_onTextFieldChange);
-    passwordController.addListener(_onTextFieldChange);
-    nameController.addListener(_onTextFieldChange);
-  }
+  bool _isRegistering = false; // Flag for registration progress
+  bool _obscurePassword = true; // Toggle password visibility
 
   @override
   void dispose() {
@@ -86,327 +35,385 @@ class _PaginaRegistroState extends State<PaginaRegistro> {
     super.dispose();
   }
 
-  void _onTextFieldChange() {
-    setState(() {});
-  }
-
+  // Registration Logic (with improved error handling and progress state)
   Future<void> _registrarUsuario() async {
+    if (_isRegistering) return; // Prevent multiple attempts
+
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
     String name = nameController.text.trim();
 
     if (email.isEmpty || password.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Por favor, completa todos los campos.")),
+        SnackBar(
+          content: Text("Por favor, completa todos los campos.", style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
       return;
     }
 
+    setState(() => _isRegistering = true);
+
     try {
-      // Crear usuario en Firebase Authentication
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       String uid = userCredential.user!.uid;
 
-      // Opcional: guardar datos adicionales en Firestore
+      // Store user data in Firestore
       await _firestore.collection('usuarios').doc(uid).set({
         'uid': uid,
         'nombre': name,
         'email': email,
         'fecha_creacion': FieldValue.serverTimestamp(),
+        // Add other fields if needed
       });
 
-      Navigator.pushReplacement(
+      if (!mounted) return; // Check if widget is still mounted
+
+      // Navigate to main screen on success
+      Navigator.pushAndRemoveUntil( // Clear navigation stack
         context,
         MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+        (route) => false, // Remove all previous routes
       );
+
     } on FirebaseAuthException catch (e) {
-      String mensajeError = "Error al registrar usuario.";
+      if (!mounted) return; // Check again after async operation
+
+      String mensajeError = "Error desconocido al registrar.";
       if (e.code == 'email-already-in-use') {
-        mensajeError = "Este correo ya está registrado.";
+        mensajeError = "Este correo electrónico ya está en uso.";
       } else if (e.code == 'invalid-email') {
-        mensajeError = "Correo inválido.";
+        mensajeError = "El formato del correo electrónico no es válido.";
       } else if (e.code == 'weak-password') {
-        mensajeError = "La contraseña es demasiado débil.";
+        mensajeError = "La contraseña es demasiado débil (mínimo 6 caracteres).";
+      } else if (e.code == 'operation-not-allowed') {
+         mensajeError = "El registro por correo/contraseña no está habilitado.";
       }
+      print("FirebaseAuthException: ${e.code} - ${e.message}"); // Log detailed error
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(mensajeError)),
+        SnackBar(
+          content: Text(mensajeError, style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
+    } catch (e) { // Catch generic errors
+       if (!mounted) return;
+       print("Generic Error during registration: $e");
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+           content: Text("Ocurrió un error inesperado.", style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+           backgroundColor: Theme.of(context).colorScheme.error,
+         ),
+       );
+    } finally {
+      if (mounted) {
+        setState(() => _isRegistering = false); // Reset flag
+      }
+    }
+  }
+
+  // Google Sign-In / Registration Logic
+  Future<void> _signInWithGoogle() async {
+    if (_isRegistering) return;
+    setState(() => _isRegistering = true);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    try {
+      // Trigger the Google authentication flow.
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      // Obtain the auth details from the request.
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        if (mounted) setState(() => _isRegistering = false);
+        return;
+      }
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential for Firebase
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the credential
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        // Check if it's a new user (first time signing in with Google)
+        if (userCredential.additionalUserInfo?.isNewUser ?? false) {
+          // Store user data in Firestore for new users
+          await _firestore.collection('usuarios').doc(user.uid).set({
+            'uid': user.uid,
+            'nombre': user.displayName ?? 'Usuario Google', // Use Google display name
+            'email': user.email ?? '', // Use Google email
+            'fecha_creacion': FieldValue.serverTimestamp(),
+            // Add other fields if needed, e.g., photoURL: user.photoURL
+          });
+        }
+        // For both new and existing Google users, navigate to main screen
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const Pantallaprincipal()),
+          (route) => false,
+        );
+      } else {
+         // Handle case where user is null after sign-in (should be rare)
+         throw Exception("Usuario nulo después del inicio de sesión con Google.");
+      }
+
+    } catch (e) {
+      print("Error during Google Sign-In/Registration: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error al iniciar sesión con Google.", style: TextStyle(color: colorScheme.onError)),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isRegistering = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool camposLlenos = emailController.text.isNotEmpty &&
-        passwordController.text.isNotEmpty &&
-        nameController.text.isNotEmpty;
-
-    // Degradado condicional para el botón
-    final List<Color> gradientColors = camposLlenos
-        ? [Colors.pink.shade300, Colors.pink.shade100]
-        : [Colors.pink.shade100, Colors.pink.shade100];
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 60),
-            // Título "Registrarse"
-            const Text(
-              "Registrarse",
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Campo "Nombre completo"
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Nombre completo',
-                  labelStyle: const TextStyle(color: Colors.black87),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.purple, width: 2),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                        color: Colors.purple.shade200, width: 1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Campo "Ingresa tu correo electrónico"
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: 'Ingresa tu correo electrónico',
-                  labelStyle: const TextStyle(color: Colors.black87),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.purple, width: 2),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                        color: Colors.purple.shade200, width: 1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Campo "Crea una contraseña"
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Crea una contraseña',
-                  labelStyle: const TextStyle(color: Colors.black87),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.purple, width: 2),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                        color: Colors.purple.shade200, width: 1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // "Recuérdame" con Switch (opcional)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Recuérdame"),
-                  Switch(
-                    activeColor: Colors.purple,
-                    value: rememberMe,
-                    onChanged: (value) {
-                      setState(() {
-                        rememberMe = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Botón "REGISTRARSE" con degradado condicional
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _registrarUsuario,
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: EdgeInsets.zero,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                  ),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: gradientColors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Container(
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'REGISTRARSE',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Texto "También puedes registrarte con ..."
-            const Text(
-              "También puedes registrarte con ...",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-
-            // Iconos de redes sociales (simulados)
-            Row(
+      // Use theme background color - remove Container with gradient
+      // backgroundColor: colorScheme.background,
+      body: SafeArea( // Ensure content doesn't overlap status bar/notches
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _socialIcon(Icons.alternate_email, Colors.lightBlue),
-                const SizedBox(width: 20),
-                _socialIcon(Icons.g_mobiledata, Colors.red),
-              ],
-            ),
-            const SizedBox(height: 30),
+                // --- App Logo (Optional) ---
+                // Icon(Icons.restaurant_menu, size: 60, color: colorScheme.primary),
+                // const SizedBox(height: 20),
 
-            // "¿Ya tienes cuenta? ¡Inicia Sesión!" -> Navega a PaginaLogin
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "¿Ya tienes cuenta? ",
-                  style: TextStyle(color: Colors.grey),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const Paginalogin(),
-                      ),
-                    );
+                // --- Title ---
+                Text(
+                  "Crear Cuenta",
+                  textAlign: TextAlign.center,
+                  style: textTheme.displaySmall?.copyWith( // Use a display style
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ).animate().fadeIn(delay: 100.ms),
+                const SizedBox(height: 8),
+                Text(
+                  "Únete a Recetas 360",
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                ).animate().fadeIn(delay: 200.ms),
+                const SizedBox(height: 35),
+
+                // --- Form Fields ---
+                TextFormField(
+                  controller: nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDecoration(
+                      context: context,
+                      label: 'Nombre completo',
+                      icon: Icons.person_outline),
+                  validator: (value) => value == null || value.isEmpty ? 'Ingresa tu nombre' : null,
+                  enabled: !_isRegistering, // Disable while registering
+                ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.1),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _inputDecoration(
+                      context: context,
+                      label: 'Correo electrónico',
+                      icon: Icons.email_outlined),
+                  validator: (value) {
+                     if (value == null || value.isEmpty) return 'Ingresa tu correo';
+                     // Basic email format check (consider a more robust regex)
+                     if (!value.contains('@') || !value.contains('.')) return 'Correo no válido';
+                     return null;
                   },
-                  child: const Text(
-                    "¡Inicia Sesión!",
-                    style: TextStyle(
-                      color: Colors.purple,
-                      fontWeight: FontWeight.bold,
+                  enabled: !_isRegistering,
+                ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: _inputDecoration(
+                    context: context,
+                    label: 'Contraseña',
+                    icon: Icons.lock_outline,
+                    // Add suffix icon to toggle visibility
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                ),
+                   validator: (value) => value == null || value.length < 6 ? 'Mínimo 6 caracteres' : null,
+                   enabled: !_isRegistering,
+                ).animate().fadeIn(delay: 500.ms).slideX(begin: -0.1),
+                const SizedBox(height: 25),
+
+                // --- Register Button ---
+                ElevatedButton(
+                  // Disable button while registering
+                  onPressed: _isRegistering ? null : _registrarUsuario,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16), // Adjust padding
+                    // backgroundColor: colorScheme.primary, // Uses theme default
+                    // foregroundColor: colorScheme.onPrimary,
+                  ),
+                  child: _isRegistering
+                      ? SizedBox( // Show progress indicator
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: colorScheme.onPrimary,
+                          ),
+                        )
+                      : const Text(
+                          'REGISTRARSE',
+                          // style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.2),
+                const SizedBox(height: 30),
+
+                 // --- Divider ---
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: colorScheme.outlineVariant)), // Themed divider
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      child: Text(
+                        "O regístrate con",
+                        style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: colorScheme.outlineVariant)),
+                  ],
+                ).animate().fadeIn(delay: 700.ms),
+                const SizedBox(height: 20),
+
+                // --- Social Login Icons ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _socialIcon(context, Icons.alternate_email, "Google", _signInWithGoogle), // Updated Google Icon
+                  ],
+                ).animate(delay: 800.ms).fadeIn().scale(begin: const Offset(0.8, 0.8)),
+                const SizedBox(height: 35),
+
+                // --- Login Link ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "¿Ya tienes cuenta? ",
+                      style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                    // Use TextButton for clearer interaction
+                    TextButton(
+                       onPressed: _isRegistering ? null : () { // Disable if registering
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const Paginalogin()),
+                        );
+                      },
+                      child: Text(
+                        "Inicia Sesión",
+                        style: TextStyle(
+                          color: colorScheme.primary, // Use theme primary color
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ).animate().fadeIn(delay: 900.ms),
+                 const SizedBox(height: 20), // Bottom padding
               ],
             ),
-            const SizedBox(height: 30),
-
-            // Contenedor para las DOS OLAS
-            SizedBox(
-              height: 200,
-              width: double.infinity,
-              child: Stack(
-                children: [
-                  // OLA ROSA (FONDO)
-                  Positioned.fill(
-                    child: ClipPath(
-                      clipper: PinkWaveClipper(),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0xFFF48FB1), // Rosa claro
-                              Color(0xFFF06292)  // Rosa más intenso
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // OLA MORADA (ENCIMA)
-                  Positioned.fill(
-                    child: ClipPath(
-                      clipper: PurpleWaveClipper(),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0xFFBA68C8), // Morado claro
-                              Color(0xFF9C27B0)  // Morado más oscuro
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // Helper para iconos de redes sociales
-  Widget _socialIcon(IconData icon, Color color) {
-    return Container(
-      width: 45,
-      height: 45,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        color: color,
-        size: 24,
-      ),
+  // --- Helper for Input Decoration (Using Theme) ---
+  InputDecoration _inputDecoration({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon, // Make suffixIcon optional
+  }) {
+     final theme = Theme.of(context);
+     // Use theme's inputDecorationTheme as base
+     return InputDecoration(
+      labelText: label,
+      // labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), // Uses theme default
+      prefixIcon: Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 20),
+      suffixIcon: suffixIcon, // Add suffix icon if provided
+      // filled: true, // Controlled by theme's inputDecorationTheme
+      // fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.5), // Example fill
+      // border: OutlineInputBorder( // Controlled by theme
+      //   borderRadius: BorderRadius.circular(30),
+      //   borderSide: BorderSide.none,
+      // ),
+      // enabledBorder: OutlineInputBorder( // Controlled by theme
+      //   borderRadius: BorderRadius.circular(30),
+      //   borderSide: BorderSide(color: theme.colorScheme.outline),
+      // ),
+      // focusedBorder: OutlineInputBorder( // Controlled by theme
+      //   borderRadius: BorderRadius.circular(30),
+      //   borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+      // ),
     );
+  }
+
+  // --- Helper for Social Icons (Using Theme) ---
+  Widget _socialIcon(BuildContext context, IconData icon, String tooltip, VoidCallback? onTapAction) { // Added onTapAction parameter
+     final colorScheme = Theme.of(context).colorScheme;
+     return Tooltip( // Add tooltip for accessibility
+       message: "Registrarse con $tooltip",
+       child: InkWell(
+         // Use the passed function, disable if registering or no function provided
+         onTap: _isRegistering || onTapAction == null ? null : onTapAction,
+         borderRadius: BorderRadius.circular(25),
+         child: Container(
+           width: 50,
+           height: 50,
+           decoration: BoxDecoration(
+             // Use surface variant or outline for background/border
+             color: colorScheme.surfaceContainerHighest.withOpacity(0.8),
+             shape: BoxShape.circle,
+             border: Border.all(color: colorScheme.outlineVariant, width: 1),
+           ),
+           child: Icon(
+             icon,
+             color: colorScheme.primary, // Use primary color for icon
+             size: 24,
+           ),
+         ),
+       ),
+     );
   }
 }
