@@ -5,9 +5,7 @@ import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/PantallaGastronomias.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
-import '../widgetsutilizados/burbujaestilo.dart';// Asegúrate de importar esta pantalla
 import 'package:recetas360/widgetsutilizados/burbujaestilo.dart';
-// Asegúrate que la ruta a Burbujawidget sea correcta según tu estructura
 
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -102,33 +100,16 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
               tooltip: "Historial",
               onPressed: () => _navigateTo(const HistorialRecetas())),
           IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              tooltip: "Ajustes",
-              onPressed: () => _navigateTo(const PaginaAjustes())),
-            icon: const Icon(Icons.shopping_cart, color: Colors.white),
-            iconSize: 32,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CarritoFaltantes()),
-              ).then((_) {
-                _restartAnimation();
-              });
-            },
+            icon: const Icon(Icons.shopping_cart_outlined),
+            iconSize: 25,
+            tooltip: "Carrito",
+            onPressed: () => _navigateTo(const CarritoFaltantes()),
           ),
           IconButton(
-            iconSize: 32,
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PaginaAjustes(),
-                ),
-              ).then((_) {
-                _restartAnimation();
-              });
-            },
+            icon: const Icon(Icons.settings),
+            iconSize: 25,
+            tooltip: "Ajustes",
+            onPressed: () => _navigateTo(const PaginaAjustes()),
           ),
         ],
       ),
@@ -150,19 +131,15 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                 final double boxWidth = constraints.maxWidth;
                 final double boxHeight = constraints.maxHeight;
                 final double centerX = boxWidth / 2;
-                final double centerY = boxHeight / 2; // Usar el centro geométrico
+                final double centerY = boxHeight / 2;
                 final double minSide = math.min(boxWidth, boxHeight);
-                final double radius =
-                    minSide * 0.35; // Radio del círculo de burbujas
-                final double outerBubbleSize =
-                    minSide * 0.29; // Tamaño burbujas exteriores
-                final double centerBubbleSize =
-                    minSide * 0.33; // Tamaño burbuja central
+                final double radius = minSide * 0.35;
+                final double outerBubbleSize = minSide * 0.29;
+                final double centerBubbleSize = minSide * 0.33;
 
                 return SizedBox(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
-                  
                   child: Stack(
                     alignment: Alignment.center,
                     children: [

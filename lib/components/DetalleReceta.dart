@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:recetas360/components/Receta.dart'; // Ensure path is correct
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:recetas360/serveis/UsuarioUtil.dart';
-import 'Receta.dart';
-import 'nutritionalifno.dart';
-import 'package:recetas360/components/PasosRecetaScreen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:recetas360/serveis/UsuarioUtil.dart'; // Ensure path is correct
-// import 'nutritionalifno.dart'; // Uncomment if using this file and verify path
 import 'package:recetas360/components/PasosRecetaScreen.dart'; // Ensure path is correct
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // Necessary for date formatting
 import 'package:flutter_animate/flutter_animate.dart'; // Import flutter_animate
 import 'package:shimmer/shimmer.dart'; // Import shimmer for comment loading
@@ -45,8 +40,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
   void initState() {
     super.initState();
     _uidActual = _usuarioUtil.getUidUsuarioActual();
-    // Initialize localization if using intl with localization
-    // Intl.defaultLocale = 'es_ES'; // Example: Initialize locale in main.dart or here
+    _cargarIngredientesFaltantes(); // Load missing ingredients state
     _cargarComentariosIniciales();
     _scrollController.addListener(_scrollListener);
   }
@@ -61,16 +55,32 @@ class _DetalleRecetaState extends State<DetalleReceta> {
           .doc(widget.receta.id)
           .get();
 
-      if (doc.exists) {
-        final faltantes = Map<String, bool>.from(doc['ingredientes'] ?? {});
-        setState(() {
-          _ingredientesFaltantes = faltantes;
-          // Sincroniza los checkboxes con lo que hay en Firestore
-          for (var ing in widget.receta.ingredientes) {
-            _ingredientesSeleccionados[ing] = faltantes[ing] ?? false;
-          }
-        });
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        final faltantes = Map<String, bool>.from(data['ingredientes'] ?? {});
+        if (mounted) {
+          setState(() {
+            _ingredientesFaltantes = faltantes;
+            // Sincroniza los checkboxes con lo que hay en Firestore
+            for (var ing in widget.receta.ingredientes) {
+              _ingredientesSeleccionados[ing] = faltantes[ing] ?? false;
+            }
+          });
+        }
       } else {
+        // Initialize if no document exists
+        if (mounted) {
+          setState(() {
+            _ingredientesFaltantes = {};
+            for (var ing in widget.receta.ingredientes) {
+              _ingredientesSeleccionados[ing] = false;
+            }
+          });
+        }
+      }
+    } else {
+      // Initialize for logged-out user or if userId is null
+      if (mounted) {
         setState(() {
           _ingredientesFaltantes = {};
           for (var ing in widget.receta.ingredientes) {
@@ -92,7 +102,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
           .set({
         'ingredientes': _ingredientesFaltantes,
         'recetaNombre': widget.receta.nombre,
-      });
+        // Optionally add a timestamp for when it was last updated
+        'actualizadoEn': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)); // Use merge true to be safe
     }
   }
 
@@ -100,10 +112,13 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     setState(() {
       for (var ing in widget.receta.ingredientes) {
         _ingredientesSeleccionados[ing] = marcar;
-        _ingredientesFaltantes[ing] = marcar;
+        _ingredientesFaltantes[ing] = marcar; // Keep this for _guardarIngredientesFaltantes
       }
     });
+    // First, save the complete map reflecting all true/false states
     _guardarIngredientesFaltantes();
+    // Then, ensure individual items are correctly set or deleted in the carrito
+    // This loop is important if 'false' means FieldValue.delete() for _actualizarCarrito
     for (var ing in widget.receta.ingredientes) {
       _actualizarCarrito(ing, marcar);
     }
@@ -117,15 +132,12 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     super.dispose();
   }
 
-  // --- Firestore Reference ---
   CollectionReference get _comentariosCollectionRef => FirebaseFirestore.instance
       .collection('recetas')
       .doc(widget.receta.id)
       .collection('comentarios');
 
-  // --- Scroll Listener ---
   void _scrollListener() {
-    // Load more when near the bottom
     if (_scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 200 &&
         !_cargandoMas &&
@@ -134,16 +146,14 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     }
   }
 
-  // --- Comment Loading Logic (Keep existing robust logic) ---
   Future<void> _cargarComentariosIniciales() async {
-    // Reset state for initial load
     if (!mounted) return;
     setState(() {
       _cargaInicial = true; _comentarios = []; _ultimoComentario = null; _todosCargados = false; _cargandoMas = false;
     });
     try {
       final snapshot = await _comentariosCollectionRef.orderBy('fecha', descending: true).limit(_comentariosPorPagina).get();
-      if (!mounted) return; // Check mounted after await
+      if (!mounted) return;
       if (snapshot.docs.isNotEmpty) {
         setState(() {
           _comentarios = snapshot.docs; _ultimoComentario = snapshot.docs.last; _todosCargados = snapshot.docs.length < _comentariosPorPagina;
@@ -153,7 +163,6 @@ class _DetalleRecetaState extends State<DetalleReceta> {
       }
     } catch (e) {
       if (!mounted) return; print("Error cargando comentarios: $e");
-      // Show themed error snackbar
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar comentarios: ${e.toString()}', style: TextStyle(color: Theme.of(context).colorScheme.onError)), backgroundColor: Theme.of(context).colorScheme.error));
     } finally {
       if (!mounted) return; setState(() { _cargaInicial = false; });
@@ -165,7 +174,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     setState(() { _cargandoMas = true; });
     try {
       final snapshot = await _comentariosCollectionRef.orderBy('fecha', descending: true).startAfterDocument(_ultimoComentario!).limit(_comentariosPorPagina).get();
-      if (!mounted) return; // Check mounted after await
+      if (!mounted) return;
       if (snapshot.docs.isNotEmpty) {
         setState(() {
           _comentarios.addAll(snapshot.docs); _ultimoComentario = snapshot.docs.last; _todosCargados = snapshot.docs.length < _comentariosPorPagina;
@@ -175,33 +184,27 @@ class _DetalleRecetaState extends State<DetalleReceta> {
       }
     } catch (e) {
       if (!mounted) return; print("Error cargando más comentarios: $e");
-      // Show themed error snackbar
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar más comentarios: ${e.toString()}', style: TextStyle(color: Theme.of(context).colorScheme.onError)), backgroundColor: Theme.of(context).colorScheme.error));
     } finally {
       if (!mounted) return; setState(() { _cargandoMas = false; });
     }
   }
 
-  // --- Date Formatting ---
   String _formatearFecha(DateTime fecha) {
     try {
-      // Ensure 'es_ES' locale is initialized if using it, otherwise use default
       return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(fecha);
     } catch (e) {
        print("Error formateando fecha con intl locale 'es_ES': $e. Usando formato simple.");
-       // Fallback format without locale
        return DateFormat('dd/MM/yyyy HH:mm').format(fecha);
     }
   }
 
-  // --- Add Comment/Reply/Delete Logic (Keep existing robust logic, ensure themed feedback) ---
   Future<void> _agregarComentario(String comentarioTexto) async {
     if (_uidActual == null || !mounted) return;
     final colorScheme = Theme.of(context).colorScheme;
     try {
-      // Use helper method to get user name, handle potential null
       String nombreUsuario = await _usuarioUtil.getNombreUsuarioActual() ?? 'Usuario';
-      if (!mounted) return; // Check again after await
+      if (!mounted) return;
 
       Map<String, dynamic> nuevoComentarioData = {
         'comentario': comentarioTexto, 'usuarioId': _uidActual, 'usuarioNombre': nombreUsuario,
@@ -211,10 +214,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
       if (!mounted) return;
 
       _comentarioController.clear();
-      FocusScope.of(context).unfocus(); // Hide keyboard
-      _cargarComentariosIniciales(); // Reload to show the new comment at the top
+      FocusScope.of(context).unfocus();
+      _cargarComentariosIniciales(); 
 
-      // Animate scroll to top after a short delay to allow list rebuild
       await Future.delayed(const Duration(milliseconds: 100));
       if (mounted && _scrollController.hasClients) {
          _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 500), curve: Curves.easeOutQuint);
@@ -230,7 +232,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     final colorScheme = Theme.of(context).colorScheme;
     try {
        String nombreUsuario = await _usuarioUtil.getNombreUsuarioActual() ?? 'Usuario';
-       if (!mounted) return; // Check again after await
+       if (!mounted) return;
 
        Map<String, dynamic> nuevaRespuestaData = {
         'comentario': respuestaTexto, 'usuarioId': _uidActual, 'usuarioNombre': nombreUsuario,
@@ -238,7 +240,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
        };
        await _comentariosCollectionRef.add(nuevaRespuestaData);
        if (!mounted) return;
-       _cargarComentariosIniciales(); // Reload to show reply in place
+       _cargarComentariosIniciales();
     } catch (e) {
       print('Error al agregar respuesta: $e'); if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al agregar respuesta: ${e.toString()}', style: TextStyle(color: colorScheme.onError)), backgroundColor: colorScheme.error));
@@ -251,81 +253,68 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     final docRef = FirebaseFirestore.instance
         .collection('usuarios')
         .doc(userId)
-        .collection('recetas_faltantes')
+        .collection('recetas_faltantes') // This collection stores what's missing for a recipe
         .doc(widget.receta.id);
 
-    if (seleccionado) {
-      // Añadir ingrediente al carrito
+    bool esFaltante = _ingredientesFaltantes[ingrediente] ?? false;
+
+    if (esFaltante) {
       await docRef.set({
         'ingredientes.$ingrediente': true,
+        'recetaNombre': widget.receta.nombre,
+        'actualizadoEn': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } else {
-      // Eliminar ingrediente del carrito
-      await docRef.set({
+      await docRef.update({
         'ingredientes.$ingrediente': FieldValue.delete(),
-      }, SetOptions(merge: true));
+      });
+    }
+  }
+  
+  Future<void> _borrarComentario(String comentarioId) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text('Confirmar Borrado'),
+        content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: colorScheme.error),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmar != true) return;
+
+    try {
+      await _comentariosCollectionRef.doc(comentarioId).delete();
+      if (!mounted) return;
+      setState(() { _comentarios.removeWhere((doc) => doc.id == comentarioId); });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comentario borrado')));
+    } catch (e) {
+      print("Error al borrar comentario: $e"); if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al borrar: ${e.toString()}', style: TextStyle(color: colorScheme.onError)), backgroundColor: colorScheme.error));
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.receta.nombre),
-        backgroundColor: Colors.orangeAccent,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_cart),
-            onPressed: () => _mostrarIngredientesFaltantes(context),
-          ),
-        ],
-   Future<void> _borrarComentario(String comentarioId) async {
-       final colorScheme = Theme.of(context).colorScheme;
-       // Show themed confirmation dialog
-       final confirmar = await showDialog<bool>(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)), // M3 Shape
-          title: const Text('Confirmar Borrado'),
-          content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
-          actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: colorScheme.error), // Use theme error color for delete action
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Borrar'),
-            ),
-          ],
-        ),
-      );
-
-      if (!mounted || confirmar != true) return; // Check mounted and confirmation
-
-      try {
-        await _comentariosCollectionRef.doc(comentarioId).delete();
-        if (!mounted) return; // Check mounted after await
-        setState(() { _comentarios.removeWhere((doc) => doc.id == comentarioId); }); // Update local list immediately
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comentario borrado')));
-      } catch (e) {
-        print("Error al borrar comentario: $e"); if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al borrar: ${e.toString()}', style: TextStyle(color: colorScheme.onError)), backgroundColor: colorScheme.error));
-      }
-   }
-
-  // --- Show Reply Dialog (Keep existing logic, uses internal themed widget) ---
   void _mostrarDialogoRespuesta(String comentarioId, String nombreUsuario) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (ctx, anim1, anim2) => _DialogoRespuestaWidget( // Use the themed dialog widget
+      pageBuilder: (ctx, anim1, anim2) => _DialogoRespuestaWidget(
         comentarioPadreId: comentarioId,
         nombreUsuarioPadre: nombreUsuario,
         onResponder: (respuestaTexto) async => await _agregarRespuesta(comentarioId, respuestaTexto),
       ),
       transitionBuilder: (ctx, anim1, anim2, child) {
-         // Use curved animation for smoother transition
          final curved = CurvedAnimation(parent: anim1, curve: Curves.easeOutQuad);
          return ScaleTransition(
            scale: Tween<double>(begin: 0.9, end: 1.0).animate(curved),
@@ -335,12 +324,10 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     );
   }
 
-  // --- Build Comment List (Refactored for Theme and Animation) ---
   List<Widget> _buildComentariosAgrupados(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    // Grouping logic remains the same
     Map<String, List<DocumentSnapshot>> respuestasPorComentario = {};
     List<DocumentSnapshot> comentariosPrincipales = [];
     for (var doc in _comentarios) {
@@ -353,13 +340,12 @@ class _DetalleRecetaState extends State<DetalleReceta> {
         comentariosPrincipales.add(doc);
       }
     }
-    // Sort replies ascending (oldest first) within each group
     respuestasPorComentario.forEach((key, listaRespuestas) {
       listaRespuestas.sort((a, b) {
         final fechaA = (a.data() as Map<String, dynamic>?)?['fecha'] as Timestamp?;
         final fechaB = (b.data() as Map<String, dynamic>?)?['fecha'] as Timestamp?;
         if (fechaA == null && fechaB == null) return 0;
-        if (fechaA == null) return -1; // Sort nulls first if desired, or 1 for last
+        if (fechaA == null) return -1;
         if (fechaB == null) return 1;
         return fechaA.compareTo(fechaB);
       });
@@ -376,13 +362,11 @@ class _DetalleRecetaState extends State<DetalleReceta> {
       final nombreUsuario = comentarioData['usuarioNombre'] ?? 'Usuario';
       final comentarioTexto = comentarioData['comentario'] ?? '';
 
-      // --- Main Comment Card ---
       comentariosWidgets.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 6.0),
           child: Card(
             elevation: esUsuarioActual ? 0 : 1,
-            // Use M3 container colors for background differentiation
             color: esUsuarioActual ? colorScheme.primaryContainer.withOpacity(0.4) : colorScheme.surfaceContainerHighest,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             clipBehavior: Clip.antiAlias,
@@ -391,7 +375,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   Row( // Header
+                   Row(
                      crossAxisAlignment: CrossAxisAlignment.center,
                      children: [
                        CircleAvatar(
@@ -414,15 +398,15 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                      ],
                    ),
                   const SizedBox(height: 8),
-                  Text(comentarioTexto, style: textTheme.bodyMedium), // Content
+                  Text(comentarioTexto, style: textTheme.bodyMedium),
                   const SizedBox(height: 10),
-                  Row( // Footer
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(_formatearFecha(fecha), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
                       TextButton.icon(
                         onPressed: () => _mostrarDialogoRespuesta(doc.id, nombreUsuario),
-                        icon: Icon(Icons.reply_rounded, size: 16, color: colorScheme.primary), // Use rounded icon
+                        icon: Icon(Icons.reply_rounded, size: 16, color: colorScheme.primary),
                         label: Text('Responder', style: textTheme.labelMedium?.copyWith(color: colorScheme.primary)),
                         style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                       ),
@@ -431,77 +415,15 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.timer, color: Colors.orangeAccent),
-                const SizedBox(width: 8),
-                Text("${widget.receta.tiempoMinutos} min"),
-              ],
-            ),
-            const Divider(height: 32),
-            const Text(
-              "Ingredientes por comprar:",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ...widget.receta.ingredientes.map((ing) {
-              return CheckboxListTile(
-                title: Text(ing),
-                value: _ingredientesSeleccionados[ing] ?? false,
-                onChanged: (bool? value) async {
-                  setState(() {
-                    _ingredientesSeleccionados[ing] = value ?? false;
-                    _ingredientesFaltantes[ing] = value ?? false;
-                  });
-                  await _guardarIngredientesFaltantes();
-                  await _actualizarCarrito(ing, value ?? false);
-                },
-              );
-            }).toList(),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: () => _marcarTodos(true),
-                  child: const Text("Marcar todos"),
-                ),
-                ElevatedButton(
-                  onPressed: () => _marcarTodos(false),
-                  child: const Text("Marcar ninguno"),
-                ),
-              ],
-            ),
-            const Divider(height: 32),
-            const Text(
-              "Descripción:",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(widget.receta.descripcion),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orangeAccent,
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PasosRecetaScreen(receta: widget.receta),
           ),
         )
-        // Animate the main comment card
         .animate().fadeIn(duration: 400.ms, delay: (50 * i).ms).slideY(begin: 0.1, curve: Curves.easeOutCubic)
       );
 
-      // --- Replies Section ---
       if (respuestasPorComentario.containsKey(doc.id)) {
         comentariosWidgets.add(
           Padding(
-             padding: const EdgeInsets.only(left: 32.0, top: 0, bottom: 4, right: 0), // Indent replies
+             padding: const EdgeInsets.only(left: 32.0, top: 0, bottom: 4, right: 0),
              child: Column(
                crossAxisAlignment: CrossAxisAlignment.start,
                children: respuestasPorComentario[doc.id]!.asMap().entries.map((entry) {
@@ -513,21 +435,18 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                  final nombreUsuarioRespuesta = respuestaData['usuarioNombre'] ?? 'Usuario';
                  final respuestaTexto = respuestaData['comentario'] ?? '';
 
-                 // --- Reply Card ---
                  return Padding(
                    padding: const EdgeInsets.only(top: 8.0),
                    child: Card(
                       elevation: 0,
-                      // Use outlined card style for replies
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5))),
-                      // Optional subtle background for user's reply
                       color: esUsuarioActualRespuesta ? colorScheme.secondaryContainer.withOpacity(0.3) : null,
                      child: Padding(
                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
-                           Row( // Reply Header
+                           Row(
                              crossAxisAlignment: CrossAxisAlignment.center,
                              children: [
                                CircleAvatar(radius: 12, backgroundColor: colorScheme.secondary, child: Text(nombreUsuarioRespuesta.isNotEmpty ? nombreUsuarioRespuesta[0].toUpperCase() : '?', style: textTheme.labelSmall?.copyWith(color: colorScheme.onSecondary, fontWeight: FontWeight.bold))),
@@ -538,15 +457,14 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                              ],
                            ),
                            const SizedBox(height: 6),
-                           Text(respuestaTexto, style: textTheme.bodySmall), // Reply Content
+                           Text(respuestaTexto, style: textTheme.bodySmall),
                            const SizedBox(height: 6),
-                           Align(alignment: Alignment.centerRight, child: Text(_formatearFecha(fechaRespuesta), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant))), // Reply Date
+                           Align(alignment: Alignment.centerRight, child: Text(_formatearFecha(fechaRespuesta), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant))),
                          ],
                        ),
                      ),
                    ),
                  )
-                 // Animate the reply card
                  .animate().fadeIn(duration: 300.ms, delay: (50 * replyIndex).ms).slideX(begin: 0.1, curve: Curves.easeOut);
                }).toList(),
              ),
@@ -557,21 +475,19 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     return comentariosWidgets;
   }
 
-  // --- Shimmer Placeholder for Comments ---
   Widget _buildShimmerCommentList(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // Use M3 container colors for shimmer base/highlight
     final shimmerBaseColor = colorScheme.surfaceContainerHighest;
     final shimmerHighlightColor = colorScheme.surfaceContainer;
 
     return Shimmer.fromColors(
       baseColor: shimmerBaseColor, highlightColor: shimmerHighlightColor,
       child: Column(
-        children: List.generate(3, (index) => Padding( // Generate a few placeholders
+        children: List.generate(3, (index) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 6.0),
           child: Card(
              elevation: 0,
-             color: shimmerBaseColor, // Use base color for card background
+             color: shimmerBaseColor,
              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
              child: Padding(
                padding: const EdgeInsets.all(12.0),
@@ -592,7 +508,6 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     );
   }
 
-  // --- Build Main Widget ---
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -600,148 +515,181 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      // No explicit background color needed, uses theme's Scaffold background
       body: GestureDetector(
-         onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard on tap outside
+         onTap: () => FocusScope.of(context).unfocus(),
          child: CustomScrollView(
           controller: _scrollController,
-          // Use bouncing physics for iOS-like overscroll, AlwaysScrollable to enable even if content fits
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           slivers: [
-            // --- Collapsing App Bar with Image ---
             SliverAppBar(
-              expandedHeight: screenHeight * 0.35, // Adaptable height
-              pinned: true, // Keep AppBar visible
-              stretch: true, // Allow image stretching
-              backgroundColor: colorScheme.surface, // Use surface color for AppBar background
-              foregroundColor: colorScheme.onSurface, // Ensure icons/text have contrast
+              expandedHeight: screenHeight * 0.35,
+              pinned: true,
+              stretch: true,
+              backgroundColor: colorScheme.surface,
+              foregroundColor: colorScheme.onSurface,
               flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.symmetric(horizontal: 50, vertical: 12), // Adjust title padding
+                titlePadding: const EdgeInsets.symmetric(horizontal: 50, vertical: 12),
                 title: Text(
                   widget.receta.nombre,
-                  // Title style automatically adapts based on AppBar collapse state and theme
-                  // style: textTheme.titleLarge?.copyWith(color: colorScheme.onSurface)
                 ),
                 centerTitle: true,
                 background: Hero(
-                  // Ensure unique tag matches ListaRecetas
                   tag: 'recipe_image_${widget.receta.id}',
                   child: Image.network(
                      widget.receta.urlImagen, fit: BoxFit.cover,
-                     // Shimmer loading placeholder for image
                      loadingBuilder: (context, child, progress) => progress == null
                          ? child
                          : Shimmer.fromColors(
                              baseColor: colorScheme.surfaceContainerHighest,
                              highlightColor: colorScheme.surfaceContainer,
-                             child: Container(color: Colors.white) // Base for shimmer
+                             child: Container(color: Colors.white)
                            ),
-                     // Error placeholder for image
                      errorBuilder: (context, error, stack) => Container(
-                       color: colorScheme.surfaceContainer, // Use a container color
+                       color: colorScheme.surfaceContainer,
                        child: Center(child: Icon(Icons.broken_image_outlined, color: colorScheme.onSurfaceVariant, size: 50)),
                      ),
                   ),
                 ),
-                 stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle], // Standard stretch modes
+                 stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
               ),
+               actions: [ // Actions for SliverAppBar
+                IconButton(
+                  icon: const Icon(Icons.shopping_cart_outlined), // Use outlined for consistency
+                  tooltip: "Ver faltantes",
+                  onPressed: () => _mostrarIngredientesFaltantes(context),
+                ),
+              ],
             ),
 
-            // --- Main Content Area ---
-            SliverPadding( // Add padding around the main content list
+            SliverPadding(
               padding: const EdgeInsets.all(16.0),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // --- Basic Info (Time/Rating) ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(children: [ Icon(Icons.timer_outlined, color: colorScheme.primary, size: 20), const SizedBox(width: 8), Text("${widget.receta.tiempoMinutos} min", style: textTheme.titleMedium)]),
                       Row(children: List.generate(5, (i) => Icon(i < widget.receta.calificacion ? Icons.star_rounded : Icons.star_border_rounded, color: colorScheme.primary, size: 22))
-                          .animate(interval: 50.ms).fadeIn(delay: 300.ms)), // Animate stars
+                          .animate(interval: 50.ms).fadeIn(delay: 300.ms)),
                     ],
-                  ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.1), // Animate row
-                  const Divider(height: 32, thickness: 1), // Use DividerTheme from main theme
+                  ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.1),
+                  const Divider(height: 32, thickness: 1),
 
-                  // --- Ingredientes ---
-                  Text("Ingredientes", style: textTheme.titleLarge), // Use M3 title styles
+                  Text("Ingredientes", style: textTheme.titleLarge),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8.0, runSpacing: 6.0,
                     children: widget.receta.ingredientes.map((ing) => Chip(
                       label: Text(ing),
-                      backgroundColor: colorScheme.secondaryContainer.withOpacity(0.7), // Use M3 container color
-                      side: BorderSide.none, // Filled chip style
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // M3 chip shape
+                      backgroundColor: colorScheme.secondaryContainer.withOpacity(0.7),
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     )).toList()
-                  ).animate().fadeIn(delay: 400.ms), // Animate ingredients section
+                  ).animate().fadeIn(delay: 400.ms),
                   const Divider(height: 32, thickness: 1),
 
-                  // --- Descripción ---
+                  // --- INGREDIENTES POR COMPRAR ---
+                  Text(
+                    "Ingredientes por comprar:",
+                    style: textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  ...widget.receta.ingredientes.map((ing) {
+                    return CheckboxListTile(
+                      title: Text(ing),
+                      value: _ingredientesSeleccionados[ing] ?? false,
+                      onChanged: (bool? value) async {
+                        setState(() {
+                          _ingredientesSeleccionados[ing] = value ?? false;
+                          // Update _ingredientesFaltantes based on the checkbox
+                          // If checked (user has it), it's NOT faltante.
+                          // If unchecked (user doesn't have it), it IS faltante.
+                          _ingredientesFaltantes[ing] = !(value ?? true);
+                        });
+                        // No need to call _guardarIngredientesFaltantes here,
+                        // _actualizarCarrito will handle the specific ingredient.
+                        // Or, if you prefer, call _guardarIngredientesFaltantes after all changes.
+                        await _actualizarCarrito(ing, !(value ?? true));
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: colorScheme.primary,
+                    );
+                  }).toList(),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () => _marcarTodos(false), // Marcar todos como "NO FALTANTES" (checkboxes ON)
+                        child: const Text("Tengo todo"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => _marcarTodos(true), // Marcar todos como "FALTANTES" (checkboxes OFF)
+                        child: const Text("No tengo nada"),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 32, thickness: 1),
+                  // --- END INGREDIENTES POR COMPRAR ---
+                  
                   Text("Descripción", style: textTheme.titleLarge),
                   const SizedBox(height: 10),
                   Text(
                     widget.receta.descripcion,
-                    style: textTheme.bodyLarge?.copyWith(height: 1.5), // Use M3 body styles
+                    style: textTheme.bodyLarge?.copyWith(height: 1.5),
                     textAlign: TextAlign.justify,
-                  ).animate().fadeIn(delay: 500.ms), // Animate description
+                  ).animate().fadeIn(delay: 500.ms),
                   const SizedBox(height: 30),
 
-                  // --- Botón Iniciar ---
                   Center(
                     child: ElevatedButton.icon(
-                      // Style inherits from ElevatedButtonTheme in main theme
                       style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14), textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PasosRecetaScreen(receta: widget.receta))),
-                      icon: const Icon(Icons.play_circle_fill_rounded), // Use rounded icon
+                      icon: const Icon(Icons.play_circle_fill_rounded),
                       label: const Text("Iniciar Preparación"),
                     )
-                  ).animate().fadeIn(delay: 600.ms).shake(hz: 3, duration: 400.ms), // Animate button
+                  ).animate().fadeIn(delay: 600.ms).shake(hz: 3, duration: 400.ms),
                   const Divider(height: 40, thickness: 1),
 
-                  // --- SECCIÓN DE COMENTARIOS ---
-                  Text("Comentarios", style: textTheme.titleLarge), // Use M3 title style
+                  Text("Comentarios", style: textTheme.titleLarge),
                   const SizedBox(height: 15),
 
-                  // --- Formulario para nuevo comentario ---
                   Container(
                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                      decoration: BoxDecoration(
-                       color: colorScheme.surfaceContainerHighest, // Use M3 container color
-                       borderRadius: BorderRadius.circular(30) // Fully rounded input field
+                       color: colorScheme.surfaceContainerHighest,
+                       borderRadius: BorderRadius.circular(30)
                      ),
                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(child: TextField(
                             controller: _comentarioController, maxLines: null, minLines: 1, keyboardType: TextInputType.multiline, textInputAction: TextInputAction.newline,
                             style: textTheme.bodyMedium,
                             decoration: InputDecoration(
                               hintText: "Añade un comentario...",
-                              hintStyle: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant), // Hint text style
-                              border: InputBorder.none, // No border inside the container
+                              hintStyle: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                              border: InputBorder.none,
                               isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Adjust padding
+                              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                             ),
-                            onChanged: (_) => setState(() {}), // Update state to enable/disable send button
+                            onChanged: (_) => setState(() {}),
                           )),
-                          // Send Button
                           IconButton(
-                            icon: const Icon(Icons.send_rounded), // Use rounded icon
-                            color: _comentarioController.text.trim().isEmpty ? colorScheme.onSurfaceVariant : colorScheme.primary, // Enable/disable color
+                            icon: const Icon(Icons.send_rounded),
+                            color: _comentarioController.text.trim().isEmpty ? colorScheme.onSurfaceVariant : colorScheme.primary,
                             visualDensity: VisualDensity.compact,
                             tooltip: "Enviar",
                             onPressed: _comentarioController.text.trim().isEmpty ? null : () { _agregarComentario(_comentarioController.text.trim()); },
                           ),
                      ]),
-                  ).animate().fadeIn(delay: 700.ms), // Animate comment input
+                  ).animate().fadeIn(delay: 700.ms),
                   const SizedBox(height: 25),
 
-                  // --- Lista de Comentarios ---
                   _cargaInicial
-                      ? _buildShimmerCommentList(context) // Show themed shimmer
+                      ? _buildShimmerCommentList(context)
                       : _comentarios.isEmpty
-                          ? Padding( // Empty State
+                          ? Padding(
                               padding: const EdgeInsets.symmetric(vertical: 40.0),
                               child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                                 Icon(Icons.chat_bubble_outline_rounded, size: 50, color: colorScheme.secondary),
@@ -749,12 +697,10 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                                 Text('No hay comentarios aún.\n¡Sé el primero!', style: textTheme.titleMedium?.copyWith(color: colorScheme.secondary), textAlign: TextAlign.center),
                               ])),
                             ).animate().fadeIn(delay: 200.ms)
-                          : Column( // Comment List + Load More Indicator
+                          : Column(
                               children: [
-                                ..._buildComentariosAgrupados(context), // Uses internal animation
-                                // Loading indicator for pagination
+                                ..._buildComentariosAgrupados(context),
                                 if (_cargandoMas) const Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: Center(child: CircularProgressIndicator(strokeWidth: 2.0))),
-                                // End of comments indicator
                                 if (_todosCargados && _comentarios.isNotEmpty && !_cargandoMas)
                                    Padding(padding: const EdgeInsets.symmetric(vertical: 30.0), child: Center(child: Text("—— Fin ——", style: textTheme.labelMedium?.copyWith(color: colorScheme.outline)))).animate().fadeIn(),
                               ],
@@ -769,17 +715,18 @@ class _DetalleRecetaState extends State<DetalleReceta> {
   }
 
   void _mostrarIngredientesFaltantes(BuildContext context) {
+    // This list should show ingredients where _ingredientesFaltantes[ing] is true
     List<String> faltantes = _ingredientesFaltantes.entries
-        .where((entry) => entry.value)
+        .where((entry) => entry.value == true) // entry.value is true if FALTANTE
         .map((entry) => entry.key)
         .toList();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Ingredientes faltantes - ${widget.receta.nombre}'),
+        title: Text('Ingredientes faltantes para: ${widget.receta.nombre}'),
         content: faltantes.isEmpty
-            ? const Text('¡No te falta nada para esta receta!')
+            ? const Text('¡Tienes todo lo necesario para esta receta!')
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,7 +743,6 @@ class _DetalleRecetaState extends State<DetalleReceta> {
   }
 }
 
-// --- Widget StatefulWidget para el contenido del diálogo de respuesta (M3 Themed) ---
 class _DialogoRespuestaWidget extends StatefulWidget {
   final String comentarioPadreId;
   final String nombreUsuarioPadre;
@@ -830,46 +776,42 @@ class __DialogoRespuestaWidgetState extends State<_DialogoRespuestaWidget> {
 
   @override
   Widget build(BuildContext context) {
-     final colorScheme = Theme.of(context).colorScheme; // Get theme
+     final colorScheme = Theme.of(context).colorScheme;
 
-    // Use standard M3 AlertDialog
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)), // M3 Dialog shape
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       title: Text('Responder a ${widget.nombreUsuarioPadre}'),
       content: TextField(
         controller: _respuestaController,
         decoration: const InputDecoration(
           hintText: 'Escribe tu respuesta...',
-          border: OutlineInputBorder(), // Uses themed OutlineInputBorder
+          border: OutlineInputBorder(),
         ),
-        maxLines: null, minLines: 2, // Allow multiple lines
+        maxLines: null, minLines: 2,
         keyboardType: TextInputType.multiline,
         textInputAction: TextInputAction.newline,
         autofocus: true,
-        onChanged: (_) => setState(() {}), // Update state to enable/disable button
+        onChanged: (_) => setState(() {}),
       ),
       actions: <Widget>[
         TextButton(
-          onPressed: _estaEnviando ? null : () { Navigator.of(context).pop(); }, // Disable while sending
+          onPressed: _estaEnviando ? null : () { Navigator.of(context).pop(); },
           child: const Text('Cancelar'),
         ),
         TextButton(
-          // Disable button if text is empty or sending
           onPressed: _respuestaController.text.trim().isEmpty || _estaEnviando ? null : () async {
             final respuestaTexto = _respuestaController.text.trim();
             setState(() => _estaEnviando = true);
             try { await widget.onResponder(respuestaTexto); }
             catch (e) {
                print("Error en callback onResponder: $e");
-               // Show themed error snackbar
                if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error al enviar respuesta", style: TextStyle(color: colorScheme.onError)), backgroundColor: colorScheme.error));
             } finally {
                if (mounted) { setState(() => _estaEnviando = false); }
             }
-            if (mounted) { Navigator.of(context).pop(); } // Close dialog on success or final attempt
+            if (mounted) { Navigator.of(context).pop(); }
           },
           child: _estaEnviando
-              // Show progress indicator while sending
               ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary))
               : const Text('Responder'),
         ),

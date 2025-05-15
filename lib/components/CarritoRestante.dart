@@ -27,15 +27,45 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
 
   Future<void> _actualizarIngrediente(String recetaId, String ingrediente, bool nuevoEstado) async {
     String? userId = _usuarioUtil.getUidUsuarioActual();
-    if (userId != null) {
-      await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userId)
-          .collection('recetas_faltantes')
-          .doc(recetaId)
-          .update({
-        'ingredientes.$ingrediente': nuevoEstado,
-      });
+    if (userId == null) return;
+    
+    // Verificar si este es el último ingrediente faltante
+    final ingredientesFaltantes = _ingredientesFaltantesPorReceta[recetaId] ?? {};
+    ingredientesFaltantes[ingrediente] = nuevoEstado;
+    
+    final docRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .collection('recetas_faltantes')
+        .doc(recetaId);
+        
+    try {
+      if (nuevoEstado) {
+        // Si el ingrediente ahora es faltante, lo actualizamos/agregamos
+        await docRef.set({
+          'ingredientes': {ingrediente: true},
+          'actualizadoEn': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        // Si el ingrediente ya no es faltante, lo eliminamos del documento
+        await docRef.update({
+          'ingredientes.$ingrediente': FieldValue.delete(),
+        });
+        
+        // Verificamos si quedan ingredientes faltantes
+        final sigueHabiendoFaltantes = ingredientesFaltantes.values.any((faltante) => faltante);
+        
+        if (!sigueHabiendoFaltantes) {
+          // Si no quedan ingredientes faltantes, eliminamos el documento completo
+          await docRef.delete();
+          setState(() {
+            _ingredientesFaltantesPorReceta.remove(recetaId);
+          });
+        }
+      }
+    } catch (e) {
+      print("Error al actualizar el ingrediente: $e");
+      // Aquí podrías mostrar un SnackBar con el error
     }
   }
 
@@ -164,14 +194,14 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                               ),
                               title: Text(ingrediente),
                               onTap: () {
+                                // Guardar el estado actual
+                                final estadoActual = ingredientes[ingrediente] ?? true;
+                                // Actualizar el estado local
                                 setState(() {
-                                  ingredientes[ingrediente] = !ingredientes[ingrediente]!;
+                                  ingredientes[ingrediente] = !estadoActual;
                                 });
-                                _actualizarIngrediente(doc.id, ingrediente, !ingredientes[ingrediente]!);
-
-                                if (!ingredientes.values.any((faltante) => faltante)) {
-                                  _ingredientesFaltantesPorReceta.remove(doc.id);
-                                }
+                                // Actualizar en Firestore (usando el valor opuesto al actual)
+                                _actualizarIngrediente(doc.id, ingrediente, !estadoActual);
                               },
                               onLongPress: () {
                                 FirebaseFirestore.instance
@@ -187,7 +217,7 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => DetalleReceta(
-                                          receta: Receta.fromFirestore(recetaData),
+                                          receta: Receta.fromFirestore(recetaData, recetaDoc.id),
                                         ),
                                       ),
                                     );
@@ -198,6 +228,13 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                                       ),
                                     );
                                   }
+                                }).catchError((error) {
+                                  print("Error al cargar detalles de receta: $error");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Error al cargar la receta'),
+                                    ),
+                                  );
                                 });
                               },
                             );

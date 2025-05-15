@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
 import 'package:recetas360/components/Receta.dart';
-import 'package:recetas360/components/editarReceta.dart'; // Ensure this import is correct
-import 'package:recetas360/pagines/InterfazAjustes.dart'; // Ensure this import is correct
-import 'package:recetas360/pagines/PantallacrearReceta.dart'; // Ensure this import is correct
-import 'package:recetas360/pagines/HistorialRecetas.dart'; // Ensure this import is correct
-import 'package:flutter_animate/flutter_animate.dart'; // Import flutter_animate
+import 'package:recetas360/components/editarReceta.dart';
+import 'package:recetas360/pagines/InterfazAjustes.dart';
+import 'package:recetas360/pagines/PantallacrearReceta.dart';
+import 'package:recetas360/pagines/HistorialRecetas.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
-import 'package:shimmer/shimmer.dart'; // Import shimmer
-import 'package:share_plus/share_plus.dart'; // Import share_plus
-import 'package:firebase_dynamic_links/firebase_dynamic_links.dart'; // Importar
+import 'package:shimmer/shimmer.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 
 // Current User's Login: joelramoss
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:49:18
@@ -34,11 +34,10 @@ class _ListaRecetasState extends State<ListaRecetas> {
   // --- Helper: Shimmer Placeholder Card ---
   Widget _buildShimmerCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final shimmerBase =
-        colorScheme.surfaceContainerHighest; // Use a subtle base
-    final shimmerHighlight = colorScheme.surfaceContainerHighest
-        .withOpacity(0.5); // More subtle highlight
-    const double imageSize = 80.0; // Consistent size
+    final shimmerBase = colorScheme.surfaceContainerHighest;
+    final shimmerHighlight =
+        colorScheme.surfaceContainerHighest.withOpacity(0.5);
+    const double imageSize = 80.0;
     const double cardPadding = 12.0;
     const double internalPadding = 16.0;
 
@@ -55,17 +54,15 @@ class _ListaRecetasState extends State<ListaRecetas> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image Placeholder
               Container(
                 width: imageSize,
                 height: imageSize,
                 decoration: BoxDecoration(
-                  color: Colors.white, // Must be non-transparent for shimmer
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               const SizedBox(width: internalPadding),
-              // Text Placeholders
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,7 +81,6 @@ class _ListaRecetasState extends State<ListaRecetas> {
                   ],
                 ),
               ),
-              // Icon Placeholders (Simpler: just one placeholder block)
               Container(
                   width: 24,
                   height: 80,
@@ -109,7 +105,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
           children: [
             Icon(Icons.ramen_dining_outlined,
                     size: 60, color: colorScheme.secondary)
-                .animate() // Animate the icon
+                .animate()
                 .scale(
                     delay: 100.ms, duration: 400.ms, curve: Curves.elasticOut),
             const SizedBox(height: 16),
@@ -119,7 +115,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                   textTheme.titleMedium?.copyWith(color: colorScheme.secondary),
               textAlign: TextAlign.center,
             )
-                .animate() // Animate the text
+                .animate()
                 .fadeIn(delay: 200.ms, duration: 400.ms)
                 .slideY(
                     begin: 0.2,
@@ -133,7 +129,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
               icon: const Icon(Icons.add_circle_outline_rounded),
               label: const Text("Crear la Primera Receta"),
             )
-                .animate() // Animate the button
+                .animate()
                 .fadeIn(delay: 300.ms, duration: 400.ms)
                 .slideY(
                     begin: 0.5,
@@ -150,7 +146,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
   Widget _buildErrorState(BuildContext context, Object? error) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    print("Error loading recipes/favorites: $error"); // Log error
+    print("Error loading recipes/favorites: $error");
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -167,7 +163,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
             ),
             const SizedBox(height: 8),
             Text(
-              "Inténtalo de nuevo más tarde.", // Simple user message
+              "Inténtalo de nuevo más tarde.",
               style: textTheme.bodyMedium
                   ?.copyWith(color: colorScheme.onErrorContainer),
               textAlign: TextAlign.center,
@@ -192,8 +188,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
               child: const Text("Cancelar")),
           TextButton(
               style: TextButton.styleFrom(
-                  foregroundColor:
-                      colorScheme.error), // Error color for delete action
+                  foregroundColor: colorScheme.error),
               onPressed: () => Navigator.pop(context, true),
               child: const Text("Eliminar")),
         ],
@@ -201,7 +196,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
     );
   }
 
-  // --- Helper: Favorite Update ---
+  // --- Helper: Favorite Update (uses 'favoritos' subcollection) ---
   Future<void> _updateFavorite(BuildContext context, String userId,
       String recipeId, bool isCurrentlyFavorite) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -212,15 +207,9 @@ class _ListaRecetasState extends State<ListaRecetas> {
         .doc(recipeId);
     try {
       if (!isCurrentlyFavorite) {
-        // Add to favorites
         await favRef.set({'addedAt': FieldValue.serverTimestamp()});
-        // Optional: Show confirmation SnackBar
-        // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Añadido a favoritos")));
       } else {
-        // Remove from favorites
         await favRef.delete();
-        // Optional: Show confirmation SnackBar
-        // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Quitado de favoritos")));
       }
     } catch (e) {
       print("Error updating favorite: $e");
@@ -246,7 +235,6 @@ class _ListaRecetasState extends State<ListaRecetas> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Receta eliminada.")));
-      // Note: The StreamBuilder will automatically remove the item from the list.
     } catch (e) {
       print("Error deleting recipe: $e");
       if (!context.mounted) return;
@@ -260,17 +248,62 @@ class _ListaRecetasState extends State<ListaRecetas> {
     }
   }
 
+  // --- Helper: Share Recipe ---
+  Future<void> _shareRecipe(BuildContext context, Receta receta) async {
+    final String recipeName = receta.nombre;
+    final String recipeId = receta.id;
+    // Ensure this is your desired deep link structure
+    final String deepLinkUrl = "https://recetas360.com/receta?id=$recipeId";
+
+    try {
+      final DynamicLinkParameters parameters = DynamicLinkParameters(
+        uriPrefix: 'https://recetas360.page.link', // Your Firebase Dynamic Links prefix
+        link: Uri.parse(deepLinkUrl),
+        androidParameters: const AndroidParameters(
+          packageName: 'com.example.recetas360', // Your Android package name
+          minimumVersion: 0,
+        ),
+        iosParameters: const IOSParameters(
+          bundleId: 'com.example.recetas360', // Your iOS bundle ID
+          minimumVersion: '0',
+        ),
+        socialMetaTagParameters: SocialMetaTagParameters(
+          title: '¡Mira esta receta: $recipeName!',
+          description: 'Descubre cómo preparar $recipeName en Recetas360.',
+          imageUrl: Uri.tryParse(receta.urlImagen),
+        ),
+      );
+      final ShortDynamicLink shortLink =
+          await FirebaseDynamicLinks.instance.buildShortLink(parameters);
+      final Uri shortUrl = shortLink.shortUrl;
+      Share.share(
+        '¡Echa un vistazo a esta receta: $recipeName! ${shortUrl.toString()}',
+        subject: 'Receta: $recipeName',
+      );
+    } catch (e) {
+      print("Error al crear el enlace dinámico: $e");
+      // Fallback to simple text share
+      final String shareText =
+          "¡Mira esta deliciosa receta: $recipeName!\n\n"
+          "Tiempo: ${receta.tiempoMinutos} min\n"
+          "Calificación: ${receta.calificacion} estrellas\n\n"
+          "Encuéntrala en Recetas360 (o tu app)."; // Generic app mention
+      Share.share(shareText, subject: 'Receta: $recipeName');
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     const double cardPadding = 16.0;
     const double starSize = 18.0;
+    const double imageSize = 80.0;
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
     return StreamBuilder<QuerySnapshot>(
-      // Outer Stream: Favorites
       stream: userId != null
           ? FirebaseFirestore.instance
               .collection('usuarios')
@@ -278,14 +311,12 @@ class _ListaRecetasState extends State<ListaRecetas> {
               .collection('favoritos')
               .snapshots()
           : Stream<QuerySnapshot<Map<String, dynamic>>>.value(
-              QuerySnapshotData([], {})),
+              QuerySnapshotData([], {})), // Empty snapshot for logged-out users
       builder: (context, favoritesSnapshot) {
-        // Handle favorite stream state
         if (userId != null &&
             favoritesSnapshot.connectionState == ConnectionState.waiting) {
-          // Show a basic loading Scaffold while favorites load initially
           return Scaffold(
-            appBar: _buildAppBar(context, textTheme), // Use helper for AppBar
+            appBar: _buildAppBar(context, textTheme),
             body: ListView.builder(
               padding: const EdgeInsets.symmetric(
                   horizontal: cardPadding, vertical: cardPadding),
@@ -295,20 +326,17 @@ class _ListaRecetasState extends State<ListaRecetas> {
           );
         }
         if (favoritesSnapshot.hasError) {
-          // Show error Scaffold if favorites fail
           return Scaffold(
             appBar: _buildAppBar(context, textTheme),
             body: _buildErrorState(context, favoritesSnapshot.error),
           );
         }
 
-        // Favorites loaded (or user not logged in)
         final Set<String> favoriteIds =
             userId == null || !favoritesSnapshot.hasData
                 ? <String>{}
                 : favoritesSnapshot.data!.docs.map((doc) => doc.id).toSet();
 
-        // --- Inner Stream: Recipes ---
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('recetas')
@@ -316,66 +344,44 @@ class _ListaRecetasState extends State<ListaRecetas> {
               .where('gastronomia', isEqualTo: widget.subCategory)
               .snapshots(),
           builder: (context, recipeSnapshot) {
-            // --- Build the Scaffold INSIDE the recipe stream builder ---
             Widget body;
-            bool recipesExist =
-                false; // Determine existence based on this snapshot
+            bool recipesExist = false;
 
             if (recipeSnapshot.connectionState == ConnectionState.waiting) {
               body = ListView.builder(
-                // Shimmer for recipe loading
                 padding: const EdgeInsets.symmetric(
                     horizontal: cardPadding, vertical: cardPadding),
                 itemCount: 5,
                 itemBuilder: (context, index) => _buildShimmerCard(context),
               );
-              // Assume recipes might exist while loading, show FAB optimistically? Or hide? Let's hide for now.
-              recipesExist = false; // Or keep false until data confirms
             } else if (recipeSnapshot.hasError) {
               body = _buildErrorState(context, recipeSnapshot.error);
-              recipesExist = false;
             } else if (!recipeSnapshot.hasData ||
                 recipeSnapshot.data!.docs.isEmpty) {
-              body = _buildEmptyState(context); // Empty state
-              recipesExist = false;
+              body = _buildEmptyState(context);
             } else {
-              // Data loaded and not empty
               recipesExist = true;
               final recetasDocs = recipeSnapshot.data!.docs;
               body = ListView.builder(
-                // Actual recipe list
-                padding: const EdgeInsets.only(
+                padding: EdgeInsets.only(
                   left: cardPadding,
                   right: cardPadding,
                   top: cardPadding,
-                  bottom: cardPadding +
-                      72, // Add space for FAB (56 height + 16 margin)
+                  bottom: cardPadding + (recipesExist ? 72 : 0), // Space for FAB
                 ),
                 itemCount: recetasDocs.length,
                 itemBuilder: (context, index) {
-                  // --- Recipe Card Logic (remains the same) ---
                   final doc = recetasDocs[index];
                   final data = doc.data() as Map<String, dynamic>?;
+
                   if (data == null ||
                       data['nombre'] == null ||
                       data['urlImagen'] == null) {
-                    return const SizedBox.shrink();
+                    return const SizedBox.shrink(); // Skip invalid item
                   }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text("No se encontraron recetas."));
-                  }
-                  final recetasDocs = snapshot.data!.docs;
-                  // Convertir los documentos en objetos Receta, incluyendo el ID.
-                  final List<Receta> recetas = recetasDocs.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    data['id'] = doc.id;
-                    // Inicializamos el estado de favoritos con el valor de isFavorite
-                    _favorites[doc.id] = data['isFavorite'] ?? false;
-                    return Receta.fromFirestore(data);
-                  }).toList();
+
                   final receta = Receta.fromFirestore(data, doc.id);
                   final bool isFavorite = favoriteIds.contains(receta.id);
-                  const double imageSize = 80.0;
 
                   return GestureDetector(
                     onTap: () => Navigator.push(
@@ -393,7 +399,6 @@ class _ListaRecetasState extends State<ListaRecetas> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Image
                             Hero(
                               tag: 'recipe_image_${receta.id}',
                               child: ClipRRect(
@@ -440,7 +445,6 @@ class _ListaRecetasState extends State<ListaRecetas> {
                               ),
                             ),
                             const SizedBox(width: 16),
-                            // Text Info
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,40 +472,11 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                 ],
                               ),
                             ),
-                          ),
-                        );
-                      }
-
-                      final receta = recetas[index];
-                      // Usamos el valor de _favorites para determinar si es favorita
-                      final isFavorite = _favorites[receta.id] ?? false;
-
-                      // Construimos la tarjeta de cada receta con un layout personalizado
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DetalleReceta(receta: receta),
-                            ),
-                          );
-                        },
-                        child: Card(
-                          color: isFavorite ? Colors.pink.shade100 : Colors.white, // Cambia el color de fondo según el estado
-                          elevation: 4,
-                          margin: EdgeInsets.only(bottom: cardPadding),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(cardPadding),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                            // Action Icons
+                            // Action Icons Column
                             Column(
                               mainAxisAlignment: MainAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min, // Important for Row layout
                               children: [
-                                // Favorite
                                 IconButton(
                                   icon: Icon(isFavorite
                                       ? Icons.favorite_rounded
@@ -516,13 +491,10 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                       ? null
                                       : () => _updateFavorite(context, userId,
                                           receta.id, isFavorite),
-                                  visualDensity: VisualDensity
-                                      .compact, // Make icons tighter
+                                  visualDensity: VisualDensity.compact,
                                 ),
-                                // Edit
                                 IconButton(
-                                  icon: const Icon(Icons
-                                      .edit_note_rounded), // Example rounded icon
+                                  icon: const Icon(Icons.edit_note_rounded),
                                   color: colorScheme.secondary,
                                   tooltip: "Editar",
                                   onPressed: () => Navigator.push(
@@ -532,143 +504,15 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                               EditarReceta(receta: receta))),
                                   visualDensity: VisualDensity.compact,
                                 ),
-                                // Share
                                 IconButton(
                                   icon: const Icon(Icons.share_rounded),
                                   color: colorScheme.tertiary,
                                   tooltip: "Compartir receta",
-                                  onPressed: () async {
-                                    final String recipeName = receta.nombre;
-                                    final String recipeId = receta.id;
-                                    final String deepLinkUrl =
-                                        "https://recetas360.com/receta?id=$recipeId";
-
-                                    final DynamicLinkParameters parameters =
-                                        DynamicLinkParameters(
-                                      uriPrefix:
-                                          'https://recetas360.page.link', //a CORRECTO: Solo el dominio con https
-                                      link: Uri.parse(deepLinkUrl),
-                                      androidParameters:
-                                          const AndroidParameters(
-                                        packageName: 'com.example.recetas360',
-                                        minimumVersion: 0,
-                                      ),
-                                      iosParameters: const IOSParameters(
-                                        bundleId: 'com.example.recetas360',
-                                        minimumVersion: '0',
-                                      ),
-                                      socialMetaTagParameters:
-                                          SocialMetaTagParameters(
-                                        title:
-                                            '¡Mira esta receta: $recipeName!',
-                                        description:
-                                            'Descubre cómo preparar $recipeName en Recetas360.',
-                                        imageUrl:
-                                            Uri.tryParse(receta.urlImagen),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // Íconos de acciones (favorito, editar, eliminar) en una columna
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                                        color: isFavorite ? Colors.red : Colors.grey,
-                                      ),
-                                      onPressed: () async {
-                                        final newValue = !isFavorite;
-                                        setState(() {
-                                          _favorites[receta.id] = newValue;
-                                        });
-                                        try {
-                                          // Actualizamos el campo isFavorite directamente en la colección recetas
-                                          await FirebaseFirestore.instance
-                                              .collection('recetas')
-                                              .doc(receta.id)
-                                              .update({'isFavorite': newValue});
-                                        } catch (e) {
-                                          // Si algo sale mal, revertimos el estado de los favoritos
-                                          setState(() {
-                                            _favorites[receta.id] = isFavorite;
-                                          });
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text("Error al actualizar favorito: $e")),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.blue),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => EditarReceta(receta: receta),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () async {
-                                        final confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text("Eliminar receta"),
-                                            content: const Text("¿Estás seguro que deseas eliminar esta receta?"),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context, false),
-                                                child: const Text("Cancelar"),
-                                              ),
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context, true),
-                                                child: const Text("Eliminar"),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (confirm == true) {
-                                          await FirebaseFirestore.instance
-                                              .collection('recetas')
-                                              .doc(receta.id)
-                                              .delete();
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                    );
-
-                                    try {
-                                      final ShortDynamicLink shortLink =
-                                          await FirebaseDynamicLinks.instance
-                                              .buildShortLink(parameters);
-                                      final Uri shortUrl = shortLink.shortUrl;
-                                      Share.share(
-                                        '¡Echa un vistazo a esta receta: $recipeName! ${shortUrl.toString()}',
-                                        subject: 'Receta: $recipeName',
-                                      );
-                                    } catch (e) {
-                                      print(
-                                          "Error al crear el enlace dinámico: $e");
-                                      final String shareText =
-                                          "¡Mira esta deliciosa receta: $recipeName!\n\n"
-                                          "Tiempo: ${receta.tiempoMinutos} min\n"
-                                          "Calificación: ${receta.calificacion} estrellas\n\n"
-                                          "Encuéntrala en Recetas360.";
-                                      Share.share(shareText,
-                                          subject: 'Receta: $recipeName');
-                                    }
-                                  },
+                                  onPressed: () => _shareRecipe(context, receta),
                                   visualDensity: VisualDensity.compact,
                                 ),
-                                // Delete
                                 IconButton(
-                                  icon: const Icon(Icons
-                                      .delete_forever_rounded), // Example rounded icon
+                                  icon: const Icon(Icons.delete_forever_rounded),
                                   color: colorScheme.error,
                                   tooltip: "Eliminar",
                                   onPressed: () async {
@@ -695,16 +539,14 @@ class _ListaRecetasState extends State<ListaRecetas> {
                           duration: 300.ms,
                           delay: (50 * (index % 10)).ms,
                           curve: Curves.easeOut);
-                  // --- End Recipe Card Logic ---
                 },
               );
             }
 
-            // --- Return the Scaffold ---
             return Scaffold(
-              appBar: _buildAppBar(context, textTheme), // Use helper
-              body: body, // Use the determined body widget
-              floatingActionButton: recipesExist // Conditionally show FAB
+              appBar: _buildAppBar(context, textTheme),
+              body: body,
+              floatingActionButton: recipesExist
                   ? FloatingActionButton.extended(
                       onPressed: () => Navigator.push(
                           context,
@@ -719,16 +561,12 @@ class _ListaRecetasState extends State<ListaRecetas> {
                       curve: Curves.easeOut)
                   : null,
             );
-            // --- End Returning Scaffold ---
           },
         );
-        // --- End Inner Stream ---
       },
     );
-    // --- End Outer Stream ---
   }
 
-  // --- Helper to build AppBar (to avoid repetition) ---
   AppBar _buildAppBar(BuildContext context, TextTheme textTheme) {
     return AppBar(
       title: Text("${widget.mainCategory} / ${widget.subCategory}",
@@ -745,6 +583,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
           onPressed: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const HistorialRecetas())),
         ),
+        // Consider adding CarritoRestante if needed in this screen's AppBar
         IconButton(
           icon: const Icon(Icons.settings_rounded),
           tooltip: "Ajustes",
@@ -760,26 +599,22 @@ class _ListaRecetasState extends State<ListaRecetas> {
 class QuerySnapshotData<T extends Object?> implements QuerySnapshot<T> {
   @override
   final List<QueryDocumentSnapshot<T>> docs;
-
   @override
   final List<DocumentChange<T>> docChanges;
-
   @override
   final SnapshotMetadata metadata;
-
   @override
   final int size;
 
   QuerySnapshotData(this.docs, Map<String, dynamic> metadataMap)
       : docChanges = const [],
-        metadata = const SnapshotMetadataData(false, false), // Example metadata
+        metadata = const SnapshotMetadataData(false, false),
         size = docs.length;
 }
 
 class SnapshotMetadataData implements SnapshotMetadata {
   @override
   final bool hasPendingWrites;
-
   @override
   final bool isFromCache;
 
