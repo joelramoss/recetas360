@@ -36,6 +36,7 @@ dependencies:
   image_picker: ^1.1.1
   flutter_rating_bar: ^4.0.1
   share_plus: ^11.0.0
+  timezone: ^0.10.1
   
 
 # Development dependencies

@@ -149,132 +149,208 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: recetasConFaltantes.length,
-                    itemBuilder: (context, index) {
-                      final doc = recetasConFaltantes[index];
-                      final data = doc.data() as Map<String, dynamic>;
-                      final ingredientes = _ingredientesFaltantesPorReceta[doc.id] ?? {};
-                      final faltantes = ingredientes.entries
-                          .where((entry) => entry.value)
-                          .map((entry) => entry.key)
-                          .toList();
+                  final List<String> ingredientesTotales = [];
+                  for (final doc in recetasConFaltantes) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final ingredientes = Map<String, bool>.from(data['ingredientes'] ?? {});
+                    ingredientesTotales.addAll(
+                      ingredientes.entries
+                        .where((entry) => entry.value)
+                        .map((entry) => entry.key)
+                        .toList()
+                    );
+                  }
+                  // Elimina duplicados
+                  final ingredientesUnicos = ingredientesTotales.toSet().toList();
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 4,
-                        child: ExpansionTile(
-                          title: Text(
-                            data['recetaNombre'] ?? 'Receta sin nombre',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          children: faltantes.map((ingrediente) {
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: recetasConFaltantes.length,
+                          itemBuilder: (context, index) {
+                            final doc = recetasConFaltantes[index];
+                            final data = doc.data() as Map<String, dynamic>;
+                            final ingredientes = _ingredientesFaltantesPorReceta[doc.id] ?? {};
+                            final faltantes = ingredientes.entries
+                                .where((entry) => entry.value)
+                                .map((entry) => entry.key)
+                                .toList();
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              leading: CircleAvatar(
-                                backgroundColor: ingredientes[ingrediente] == true
-                                    ? Colors.redAccent
-                                    : Colors.greenAccent,
-                                child: Icon(
-                                  ingredientes[ingrediente] == true
-                                      ? Icons.local_grocery_store
-                                      : Icons.check,
-                                  color: Colors.white,
+                              elevation: 4,
+                              child: ExpansionTile(
+                                title: Text(
+                                  data['recetaNombre'] ?? 'Receta sin nombre',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
                                 ),
-                              ),
-                              title: Text(ingrediente),
-                              onTap: () {
-                                // Guardar el estado actual
-                                final estadoActual = ingredientes[ingrediente] ?? true;
-                                // Actualizar el estado local
-                                setState(() {
-                                  ingredientes[ingrediente] = !estadoActual;
-                                });
-                                // Actualizar en Firestore (usando el valor opuesto al actual)
-                                _actualizarIngrediente(doc.id, ingrediente, !estadoActual);
-                              },
-                              onLongPress: () {
-                                FirebaseFirestore.instance
-                                    .collection('recetas')
-                                    .doc(doc.id)
-                                    .get()
-                                    .then((recetaDoc) {
-                                  if (recetaDoc.exists) {
-                                    final recetaData = recetaDoc.data()!;
-                                    recetaData['id'] = recetaDoc.id;
-
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => DetalleReceta(
-                                          receta: Receta.fromFirestore(recetaData, recetaDoc.id),
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Esta receta ya no está disponible'),
-                                      ),
-                                    );
-                                  }
-                                }).catchError((error) {
-                                  print("Error al cargar detalles de receta: $error");
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Error al cargar la receta'),
+                                children: faltantes.map((ingrediente) {
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
                                     ),
+                                    leading: CircleAvatar(
+                                      backgroundColor: ingredientes[ingrediente] == true
+                                          ? Colors.redAccent
+                                          : Colors.greenAccent,
+                                      child: Icon(
+                                        ingredientes[ingrediente] == true
+                                            ? Icons.local_grocery_store
+                                            : Icons.check,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    title: Text(ingrediente),
+                                    onTap: () {
+                                      // Guardar el estado actual
+                                      final estadoActual = ingredientes[ingrediente] ?? true;
+                                      // Actualizar el estado local
+                                      setState(() {
+                                        ingredientes[ingrediente] = !estadoActual;
+                                      });
+                                      // Actualizar en Firestore (usando el valor opuesto al actual)
+                                      _actualizarIngrediente(doc.id, ingrediente, !estadoActual);
+                                    },
+                                    onLongPress: () {
+                                      FirebaseFirestore.instance
+                                          .collection('recetas')
+                                          .doc(doc.id)
+                                          .get()
+                                          .then((recetaDoc) {
+                                        if (recetaDoc.exists) {
+                                          final recetaData = recetaDoc.data()!;
+                                          recetaData['id'] = recetaDoc.id;
+
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => DetalleReceta(
+                                                receta: Receta.fromFirestore(recetaData, recetaDoc.id),
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Esta receta ya no está disponible'),
+                                            ),
+                                          );
+                                        }
+                                      }).catchError((error) {
+                                        print("Error al cargar detalles de receta: $error");
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Error al cargar la receta'),
+                                          ),
+                                        );
+                                      });
+                                    },
                                   );
-                                });
+                                }).toList(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            int minutosSeleccionados = 30;
+
+                            final resultado = await showDialog<int>(
+                              context: context,
+                              builder: (context) {
+                                int tempMinutos = minutosSeleccionados;
+                                return AlertDialog(
+                                  title: const Text('Selecciona el intervalo (minutos)'),
+                                  content: StatefulBuilder(
+                                    builder: (context, setState) {
+                                      return Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Slider(
+                                            min: 1,
+                                            max: 120,
+                                            divisions: 119,
+                                            value: tempMinutos.toDouble(),
+                                            label: '$tempMinutos',
+                                            onChanged: (value) {
+                                              setState(() {
+                                                tempMinutos = value.toInt();
+                                              });
+                                            },
+                                          ),
+                                          Text('$tempMinutos minutos'),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, null),
+                                      child: const Text('Cancelar'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, tempMinutos),
+                                      child: const Text('Aceptar'),
+                                    ),
+                                  ],
+                                );
                               },
                             );
-                          }).toList(),
+
+                            if (resultado != null && resultado > 0) {
+                              final minutos = resultado;
+
+                              await FirebaseFirestore.instance
+                                  .collection('usuarios')
+                                  .doc(_usuarioUtil.getUidUsuarioActual())
+                                  .collection('notificaciones_programadas')
+                                  .add({
+                                'intervalo': minutos,
+                                'ingredientes': ingredientesUnicos,
+                                'timestamp': FieldValue.serverTimestamp(),
+                              });
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Notificación programada cada $minutos minutos con los ingredientes de tus recetas.'),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orangeAccent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 4,
+                          ),
+                          child: const Text(
+                            'Enviar Información',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   );
                 },
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Placeholder action: muestra un SnackBar
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Información enviada (funcionalidad placeholder)'),
-                    ),
-                  );
-                  // Aquí puedes agregar la lógica para enviar la información
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 4,
-                ),
-                child: const Text(
-                  'Enviar Información',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
               ),
             ),
           ],
