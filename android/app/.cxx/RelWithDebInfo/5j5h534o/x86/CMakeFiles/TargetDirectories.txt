@@ -1,0 +1,2 @@
+C:/Users/j.ramos/Desktop/FlutterProjects/recetas360/android/app/.cxx/RelWithDebInfo/5j5h534o/x86/CMakeFiles/edit_cache.dir
+C:/Users/j.ramos/Desktop/FlutterProjects/recetas360/android/app/.cxx/RelWithDebInfo/5j5h534o/x86/CMakeFiles/rebuild_cache.dir

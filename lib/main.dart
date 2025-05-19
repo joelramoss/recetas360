@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
-import 'package:firebase_analytics/firebase_analytics.dart'; // Importa Firebase Analytics
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';
@@ -18,24 +18,6 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Verificar si la actualización ya se ha realizado
-  DocumentSnapshot configDoc = await FirebaseFirestore.instance
-      .collection('configuraciones')
-      .doc('actualizacion_nombres')
-      .get();
-
-  bool actualizacionCompletada = configDoc.exists && configDoc.get('completada') == true;
-
-  if (!actualizacionCompletada) {
-    await actualizarNombresEnComentarios();
-    // Marcar la actualización como completada
-    await FirebaseFirestore.instance
-        .collection('configuraciones')
-        .doc('actualizacion_nombres')
-        .set({'completada': true});
-  }
-
-  // Set up Google Fonts license (optional but recommended)
   GoogleFonts.config.allowRuntimeFetching = false;
 
   runApp(const MyApp());
@@ -45,7 +27,7 @@ Future<void> main() async {
 Future<void> actualizarNombresEnComentarios() async {
   try {
     QuerySnapshot recetasSnapshot =
-    await FirebaseFirestore.instance.collection('recetas').get();
+        await FirebaseFirestore.instance.collection('recetas').get();
 
     WriteBatch batch = FirebaseFirestore.instance.batch();
     int batchCounter = 0;
@@ -58,7 +40,10 @@ Future<void> actualizarNombresEnComentarios() async {
       for (var comentarioDoc in comentariosSnapshot.docs) {
         final data = comentarioDoc.data() as Map<String, dynamic>?;
 
-        if (data != null && data.containsKey('usuarioId') && (!data.containsKey('usuarioNombre') || data['usuarioNombre'] == 'Usuario desconocido')) {
+        if (data != null &&
+            data.containsKey('usuarioId') &&
+            (!data.containsKey('usuarioNombre') ||
+                data['usuarioNombre'] == 'Usuario desconocido')) {
           String usuarioId = data['usuarioId'];
           DocumentSnapshot userDoc = await FirebaseFirestore.instance
               .collection('usuarios')
@@ -66,8 +51,11 @@ Future<void> actualizarNombresEnComentarios() async {
               .get();
 
           if (userDoc.exists) {
-            String nombreUsuario = (userDoc.data() as Map<String, dynamic>?)?['nombre'] ?? 'Usuario desconocido';
-            batch.update(comentarioDoc.reference, {'usuarioNombre': nombreUsuario});
+            String nombreUsuario =
+                (userDoc.data() as Map<String, dynamic>?)?['nombre'] ??
+                    'Usuario desconocido';
+            batch.update(comentarioDoc.reference,
+                {'usuarioNombre': nombreUsuario});
             batchCounter++;
 
             if (batchCounter >= 400) {
@@ -76,7 +64,8 @@ Future<void> actualizarNombresEnComentarios() async {
               batchCounter = 0;
             }
           } else {
-            batch.update(comentarioDoc.reference, {'usuarioNombre': 'Usuario eliminado'});
+            batch.update(comentarioDoc.reference,
+                {'usuarioNombre': 'Usuario eliminado'});
             batchCounter++;
             if (batchCounter >= 400) {
               await batch.commit();
@@ -85,7 +74,8 @@ Future<void> actualizarNombresEnComentarios() async {
             }
           }
         } else if (data == null || !data.containsKey('usuarioId')) {
-          print('Comentario sin usuarioId o data null: ${comentarioDoc.id} en receta ${recetaDoc.id}');
+          print(
+              'Comentario sin usuarioId o data null: ${comentarioDoc.id} en receta ${recetaDoc.id}');
         }
       }
     }
@@ -95,6 +85,11 @@ Future<void> actualizarNombresEnComentarios() async {
     }
 
     print('Actualización de nombres en comentarios completada.');
+    await FirebaseFirestore.instance
+        .collection('configuraciones')
+        .doc('actualizacion_nombres')
+        .set({'completada': true});
+    print('Marca de actualización de nombres en comentarios establecida.');
   } catch (e) {
     print('Error al actualizar nombres en comentarios: $e');
     FirebaseAnalytics.instance.logEvent(
@@ -113,46 +108,107 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  // Obtén una instancia de FirebaseAnalytics
   FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initDynamicLinks();
-    analytics.logAppOpen(); // Registra un evento de apertura de la app
+    _initializeApplication();
+  }
+
+  Future<void> _initializeApplication() async {
+    await _initDynamicLinks();
+    analytics.logAppOpen();
+
+    _lanzarActualizacionComentariosEnSegundoPlano();
+
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
+  }
+
+  Future<void> _lanzarActualizacionComentariosEnSegundoPlano() async {
+    try {
+      DocumentSnapshot configDoc = await FirebaseFirestore.instance
+          .collection('configuraciones')
+          .doc('actualizacion_nombres')
+          .get();
+
+      bool actualizacionCompletada =
+          configDoc.exists && configDoc.get('completada') == true;
+
+      if (!actualizacionCompletada) {
+        print(
+            "Iniciando actualización de nombres en comentarios en segundo plano...");
+        actualizarNombresEnComentarios().catchError((error) {
+          print("Error en actualización de nombres en segundo plano: $error");
+          analytics.logEvent(
+            name: 'error_actualizar_comentarios_background',
+            parameters: {'error': error.toString()},
+          );
+        });
+      } else {
+        print(
+            "La actualización de nombres en comentarios ya fue completada previamente.");
+      }
+    } catch (e) {
+      print("Error al verificar estado de actualización de comentarios: $e");
+      analytics.logEvent(
+        name: 'error_verificar_actualizacion_comentarios',
+        parameters: {'error': e.toString()},
+      );
+    }
   }
 
   Future<void> _initDynamicLinks() async {
-    FirebaseDynamicLinks.instance.onLink.listen((PendingDynamicLinkData? dynamicLinkData) {
-      if (dynamicLinkData != null) {
+    FirebaseDynamicLinks.instance.onLink.listen(
+      (PendingDynamicLinkData? dynamicLinkData) {
+        if (dynamicLinkData != null) {
+          analytics.logEvent(
+            name: 'dynamic_link_received',
+            parameters: {'link': dynamicLinkData.link.toString()},
+          );
+          _handleDeepLink(dynamicLinkData.link);
+        }
+      },
+      onError: (error) {
+        print('Error en onLink de Dynamic Links: $error');
         analytics.logEvent(
-          name: 'dynamic_link_received',
-          parameters: {'link': dynamicLinkData.link.toString()},
+          name: 'dynamic_link_onlink_error',
+          parameters: {'error': error.toString()},
         );
-        _handleDeepLink(dynamicLinkData.link);
-      }
-    }).onError((error) {
-      print('Error en onLink de Dynamic Links: $error');
-      analytics.logEvent(
-        name: 'dynamic_link_onlink_error',
-        parameters: {'error': error.toString()},
-      );
-    });
+      },
+    );
 
-    final PendingDynamicLinkData? initialLink = await FirebaseDynamicLinks.instance.getInitialLink();
-    if (initialLink != null) {
+    try {
+      final PendingDynamicLinkData? initialLink =
+          await FirebaseDynamicLinks.instance.getInitialLink();
+      if (initialLink != null) {
+        analytics.logEvent(
+          name: 'dynamic_link_initial_received',
+          parameters: {'link': initialLink.link.toString()},
+        );
+        _handleDeepLink(initialLink.link);
+      } else {
+        analytics.logEvent(name: 'dynamic_link_initial_null');
+      }
+    } catch (e) {
+      print('Error al obtener initialLink de Dynamic Links: $e');
       analytics.logEvent(
-        name: 'dynamic_link_initial_received',
-        parameters: {'link': initialLink.link.toString()},
+        name: 'dynamic_link_initial_error',
+        parameters: {'error': e.toString()},
       );
-      _handleDeepLink(initialLink.link);
-    } else {
-      analytics.logEvent(name: 'dynamic_link_initial_null');
     }
   }
 
   void _handleDeepLink(Uri deepLink) async {
+    if (!_isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     print("Deep Link recibido: $deepLink");
     analytics.logEvent(
       name: 'handle_deep_link',
@@ -167,16 +223,29 @@ class _MyAppState extends State<MyApp> {
           parameters: {'recipe_id': recipeId},
         );
         try {
-          DocumentSnapshot recipeDoc = await FirebaseFirestore.instance.collection('recetas').doc(recipeId).get();
+          DocumentSnapshot recipeDoc = await FirebaseFirestore.instance
+              .collection('recetas')
+              .doc(recipeId)
+              .get();
           if (recipeDoc.exists && recipeDoc.data() != null) {
-            final receta = Receta.fromFirestore(recipeDoc.data() as Map<String, dynamic>, recipeDoc.id);
-            navigatorKey.currentState?.push(MaterialPageRoute(
-              builder: (_) => DetalleReceta(receta: receta),
-            ));
-            analytics.logEvent(
-              name: 'deep_link_recipe_found',
-              parameters: {'recipe_id': recipeId},
-            );
+            final receta = Receta.fromFirestore(
+                recipeDoc.data() as Map<String, dynamic>, recipeDoc.id);
+            if (navigatorKey.currentState != null) {
+              navigatorKey.currentState?.push(MaterialPageRoute(
+                builder: (_) => DetalleReceta(receta: receta),
+              ));
+              analytics.logEvent(
+                name: 'deep_link_recipe_found',
+                parameters: {'recipe_id': recipeId},
+              );
+            } else {
+              print(
+                  "Error: navigatorKey.currentState es null al intentar navegar por deep link.");
+              analytics.logEvent(
+                name: 'deep_link_navigator_null',
+                parameters: {'recipe_id': recipeId},
+              );
+            }
           } else {
             print("Receta con ID $recipeId no encontrada.");
             analytics.logEvent(
@@ -209,6 +278,20 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final poppinsTextTheme = GoogleFonts.poppinsTextTheme(textTheme);
+
+    if (!_isInitialized) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+        ),
+      );
+    }
 
     return MaterialApp(
       navigatorKey: navigatorKey,
@@ -253,7 +336,6 @@ class _MyAppState extends State<MyApp> {
       ),
       themeMode: ThemeMode.system,
       home: const Paginalogin(),
-      // Registra el observador de Firebase Analytics para el seguimiento de la navegación
       navigatorObservers: [
         FirebaseAnalyticsObserver(analytics: analytics),
       ],

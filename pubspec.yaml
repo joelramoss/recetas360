@@ -17,7 +17,6 @@ dependencies:
   firebase_storage: ^12.4.5
   firebase_dynamic_links: ^6.1.5 # O la última versión disponible
   firebase_analytics: ^11.4.5 # Añade esta línea (o la última versión)
-  flutter_local_notifications: ^19.2.1
   # State Management & Utilities
   provider: ^6.1.2
   shared_preferences: ^2.2.0
@@ -36,9 +35,6 @@ dependencies:
   image_picker: ^1.1.1
   flutter_rating_bar: ^4.0.1
   share_plus: ^11.0.0
-  timezone: ^0.10.1
-  android_intent_plus: ^5.3.0
-  
 
 # Development dependencies
 dev_dependencies:
