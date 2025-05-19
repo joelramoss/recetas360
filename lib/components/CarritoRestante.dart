@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/serveis/UsuarioUtil.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:android_intent_plus/android_intent.dart';
 
 class CarritoFaltantes extends StatefulWidget {
   const CarritoFaltantes({Key? key}) : super(key: key);
@@ -14,6 +18,7 @@ class CarritoFaltantes extends StatefulWidget {
 class _CarritoFaltantesState extends State<CarritoFaltantes> {
   final UsuarioUtil _usuarioUtil = UsuarioUtil();
   Map<String, Map<String, bool>> _ingredientesFaltantesPorReceta = {};
+  final FlutterLocalNotificationsPlugin _notificacionesPlugin = FlutterLocalNotificationsPlugin();
 
   Stream<QuerySnapshot> _cargarRecetasFaltantes() {
     String? userId = _usuarioUtil.getUidUsuarioActual();
@@ -68,6 +73,84 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
       // Aquí podrías mostrar un SnackBar con el error
     }
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _inicializarNotificaciones();
+  }
+
+  Future<void> _inicializarNotificaciones() async {
+    const AndroidInitializationSettings androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings = InitializationSettings(android: androidInit);
+    await _notificacionesPlugin.initialize(initSettings);
+  }
+
+
+  Future<void> _programarNotificacionPersonalizada(int minutos, List<String> ingredientes) async {
+    tz.initializeTimeZones();
+    await _notificacionesPlugin.zonedSchedule(
+      0,
+      '¡Recuerda comprar!',
+      'Te faltan: ${ingredientes.join(", ")}',
+      tz.TZDateTime.now(tz.local).add(Duration(minutes: minutos)),
+      const NotificationDetails(
+        android: AndroidNotificationDetails('carrito_channel', 'Carrito', importance: Importance.max),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  Future<void> _mostrarDialogoIntervalo(List<String> ingredientes) async {
+  int minutos = 5;
+  await showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('¿Cada cuántos minutos quieres recibir recordatorios?'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Slider(
+                  min: 1,
+                  max: 60,
+                  divisions: 59,
+                  value: minutos.toDouble(),
+                  label: '$minutos min',
+                  onChanged: (value) {
+                    setState(() {
+                      minutos = value.toInt();
+                    });
+                  },
+                ),
+                Text('$minutos minutos'),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _programarNotificacionPersonalizada(minutos, ingredientes);
+            },
+            child: const Text('Aceptar'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+  Future<void> solicitarPermisoExactAlarms() async {
+  final intent = AndroidIntent(
+    action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+  );
+  await intent.launch();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -266,86 +349,10 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () async {
-                            int minutosSeleccionados = 30;
-
-                            final resultado = await showDialog<int>(
-                              context: context,
-                              builder: (context) {
-                                int tempMinutos = minutosSeleccionados;
-                                return AlertDialog(
-                                  title: const Text('Selecciona el intervalo (minutos)'),
-                                  content: StatefulBuilder(
-                                    builder: (context, setState) {
-                                      return Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Slider(
-                                            min: 1,
-                                            max: 120,
-                                            divisions: 119,
-                                            value: tempMinutos.toDouble(),
-                                            label: '$tempMinutos',
-                                            onChanged: (value) {
-                                              setState(() {
-                                                tempMinutos = value.toInt();
-                                              });
-                                            },
-                                          ),
-                                          Text('$tempMinutos minutos'),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, null),
-                                      child: const Text('Cancelar'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, tempMinutos),
-                                      child: const Text('Aceptar'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-
-                            if (resultado != null && resultado > 0) {
-                              final minutos = resultado;
-
-                              await FirebaseFirestore.instance
-                                  .collection('usuarios')
-                                  .doc(_usuarioUtil.getUidUsuarioActual())
-                                  .collection('notificaciones_programadas')
-                                  .add({
-                                'intervalo': minutos,
-                                'ingredientes': ingredientesUnicos,
-                                'timestamp': FieldValue.serverTimestamp(),
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Notificación programada cada $minutos minutos con los ingredientes de tus recetas.'),
-                                ),
-                              );
-                            }
+                            // ingredientesUnicos es la lista de ingredientes faltantes
+                            await _mostrarDialogoIntervalo(ingredientesUnicos);
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orangeAccent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 4,
-                          ),
-                          child: const Text(
-                            'Enviar Información',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                          child: const Text('Recibir recordatorios'),
                         ),
                       ),
                     ],
