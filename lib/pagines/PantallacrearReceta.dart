@@ -1,23 +1,21 @@
+import 'dart:io'; // Necesario para File
 import 'package:flutter/material.dart';
-import 'package:recetas360/components/agregarReceta.dart'; // Assuming function exists
+import 'package:image_picker/image_picker.dart'; // Para seleccionar imágenes
+import 'package:recetas360/components/agregarReceta.dart';
 import 'package:recetas360/components/Receta.dart';
-import 'package:recetas360/components/nutritionalifno.dart'; // NutritionalInfo
-// Assuming showProductoSelection exists
-import 'package:recetas360/components/selecciondeproducto.dart'; // Assuming needed for showProductoSelection context
+import 'package:recetas360/components/nutritionalifno.dart';
+import 'package:recetas360/components/selecciondeproducto.dart';
 import 'package:recetas360/components/producto.dart';
-import 'package:flutter_animate/flutter_animate.dart'; // Import animate
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:recetas360/FirebaseServices.dart'; // Para StorageService
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:36:30
-
-// Ingredient selection helper class remains the same
 class IngredientSelection {
   String name;
   Producto? selected;
-  final TextEditingController controller; // Add controller
+  final TextEditingController controller;
 
   IngredientSelection({required this.name, this.selected})
-      : controller = TextEditingController(text: name); // Initialize controller
+      : controller = TextEditingController(text: name);
 }
 
 class CrearRecetaScreen extends StatefulWidget {
@@ -30,9 +28,12 @@ class CrearRecetaScreen extends StatefulWidget {
 class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nombreController = TextEditingController();
-  final TextEditingController _urlImagenController = TextEditingController();
   final TextEditingController _descripcionController = TextEditingController();
   final TextEditingController _tiempoController = TextEditingController();
+
+  File? _selectedImageFile; // Para almacenar la imagen seleccionada
+  final ImagePicker _picker = ImagePicker(); // Instancia de ImagePicker
+  final StorageService _storageService = StorageService(); // Instancia de StorageService
 
   final List<IngredientSelection> _ingredients = [];
   final List<TextEditingController> _stepControllers = [];
@@ -42,16 +43,16 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
       proteins: 0.0,
       carbs: 0.0,
       fats: 0.0,
-      saturatedFats: 0.0); // Initialize with zeros
+      saturatedFats: 0.0);
 
-  bool _isSaving = false; // Flag to prevent multiple saves
+  bool _isSaving = false;
 
   final Map<String, List<String>> categoriasConGastronomias = {
     "Carne": ["Asiatica", "Mediterranea", "Americana", "Africana", "Oceanica"],
     "Pescado": ["Asiatica", "Mediterranea", "Oceanica"],
     "Verduras": ["Asiatica", "Mediterranea", "Africana", "Americana"],
-    "Lácteos": ["Mediterranea", "Americana"], // Example
-    "Cereales": ["Asiatica", "Mediterranea", "Americana"], // Example
+    "Lácteos": ["Mediterranea", "Americana"],
+    "Cereales": ["Asiatica", "Mediterranea", "Americana"],
   };
 
   String? _selectedCategoria;
@@ -61,7 +62,6 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
   @override
   void initState() {
     super.initState();
-    // Start with one empty ingredient and step
     _addIngredient();
     _addStep();
   }
@@ -69,11 +69,10 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
   @override
   void dispose() {
     _nombreController.dispose();
-    _urlImagenController.dispose();
     _descripcionController.dispose();
     _tiempoController.dispose();
     for (var ing in _ingredients) {
-      ing.controller.dispose(); // Dispose ingredient controllers
+      ing.controller.dispose();
     }
     for (var controller in _stepControllers) {
       controller.dispose();
@@ -89,7 +88,6 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
 
   void _removeIngredient(int index) {
     setState(() {
-      // Dispose controller before removing
       _ingredients[index].controller.dispose();
       _ingredients.removeAt(index);
       _recalcularMacros();
@@ -104,26 +102,23 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
 
   void _removeStep(int index) {
     setState(() {
-      // Dispose controller before removing
       _stepControllers[index].dispose();
       _stepControllers.removeAt(index);
     });
   }
 
-  // Recalculate macros
   void _recalcularMacros() {
     NutritionalInfo total = NutritionalInfo(
         energy: 0.0,
         proteins: 0.0,
         carbs: 0.0,
         fats: 0.0,
-        saturatedFats: 0.0); // Initialize with zeros
+        saturatedFats: 0.0);
     for (var ing in _ingredients) {
       if (ing.selected != null) {
         final producto = ing.selected!;
         final infoFromProducto = NutritionalInfo(
-          energy: producto.valorEnergetico ??
-              0.0, // Use 'valorEnergetico' for energy
+          energy: producto.valorEnergetico ?? 0.0,
           proteins: producto.proteinas ?? 0.0,
           carbs: producto.carbohidratos ?? 0.0,
           fats: producto.grasas ?? 0.0,
@@ -133,14 +128,37 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
       }
     }
     if (mounted) {
-      // Check if widget is still in the tree
       setState(() {
         _totalInfo = total;
       });
     }
   }
 
-  // --- Build Ingredient Row with M3 Styling ---
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 70, // Comprime la imagen para reducir tamaño
+        maxWidth: 1024, // Redimensiona si es muy grande
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      print("Error al seleccionar imagen: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text("Error al seleccionar imagen: ${e.toString()}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+              backgroundColor: Theme.of(context).colorScheme.error),
+        );
+      }
+    }
+  }
+
   Widget _buildIngredientRow(int index) {
     final ing = _ingredients[index];
     final colorScheme = Theme.of(context).colorScheme;
@@ -152,22 +170,18 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
         children: [
           Expanded(
             child: TextFormField(
-              controller: ing.controller, // Use the controller
+              controller: ing.controller,
               decoration: InputDecoration(
-                // M3 style
                 labelText: "Ingrediente ${index + 1}",
-                // filled: true, // Use theme's default or set explicitly
-                // border: OutlineInputBorder(), // Use theme's default
                 isDense: true,
               ),
               onChanged: (value) {
-                ing.name = value; // Keep name updated if needed elsewhere
+                ing.name = value;
               },
               validator: (value) =>
                   value == null || value.isEmpty ? "Ingrediente vacío" : null,
             ),
           ),
-          // Search Button - Themed
           IconButton(
             icon: Icon(Icons.search_outlined, color: colorScheme.primary),
             tooltip: "Buscar producto",
@@ -185,27 +199,22 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                 );
                 return;
               }
-              // Show product selection dialog
               showProductoSelection(context, currentName).then((producto) {
                 if (producto != null && mounted) {
                   setState(() {
                     ing.selected = producto;
-                    // Optionally update text field if name differs significantly
-                    // ing.controller.text = producto.nombre;
                   });
                   _recalcularMacros();
                 }
               });
             },
           ),
-          // Checkmark if selected
           if (ing.selected != null)
             Padding(
               padding: const EdgeInsets.only(left: 4.0, right: 4.0),
               child: Icon(Icons.check_circle_outline_rounded,
                   color: Colors.green.shade600, size: 20),
             ),
-          // Remove Button - Themed
           if (_ingredients.length > 1)
             IconButton(
               icon: Icon(Icons.remove_circle_outline, color: colorScheme.error),
@@ -218,7 +227,6 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
     );
   }
 
-  // --- Build Step Row with M3 Styling ---
   Widget _buildStepRow(int index) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
@@ -230,17 +238,14 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
               controller: _stepControllers[index],
               decoration: InputDecoration(
                 labelText: "Paso ${index + 1}",
-                // filled: true,
-                // border: OutlineInputBorder(),
                 isDense: true,
               ),
-              maxLines: null, // Allow multiple lines
+              maxLines: null,
               keyboardType: TextInputType.multiline,
               validator: (value) =>
                   value == null || value.isEmpty ? "Paso vacío" : null,
             ),
           ),
-          // Remove Button - Themed
           if (_stepControllers.length > 1)
             IconButton(
               icon: Icon(Icons.remove_circle_outline, color: colorScheme.error),
@@ -253,14 +258,22 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
     );
   }
 
-  // --- Save Recipe Logic ---
   Future<void> _saveRecipe() async {
-    if (_isSaving) return; // Prevent double taps
+    if (_isSaving) return;
 
-    // Validate form fields
     if (!_formKey.currentState!.validate()) return;
 
-    // Validate ingredient selection
+    if (_selectedImageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Por favor, selecciona una imagen para la receta",
+              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
     for (var i = 0; i < _ingredients.length; i++) {
       if (_ingredients[i].selected == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -271,11 +284,10 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-        return; // Stop saving
+        return;
       }
     }
 
-    // Validate steps are not empty (already handled by validator, but good practice)
     if (_stepControllers.any((c) => c.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -287,37 +299,43 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
       return;
     }
 
-    setState(() => _isSaving = true); // Set saving flag
-
-    // Prepare data for Receta object
-    List<String> ingredientesFinal =
-        _ingredients.map((i) => i.selected!.nombre).toList();
-    List<String> pasos = _stepControllers.map((c) => c.text.trim()).toList();
-    int tiempoMinutos = int.tryParse(_tiempoController.text) ?? 0;
-    Map<String, dynamic> nutritionalMap = _totalInfo.toMap();
-
-    Receta nuevaReceta = Receta(
-      id: '', // Firestore will generate ID, ensure model handles this
-      nombre: _nombreController.text.trim(),
-      urlImagen: _urlImagenController.text.trim(),
-      ingredientes: ingredientesFinal,
-      descripcion: _descripcionController.text.trim(),
-      tiempoMinutos: tiempoMinutos,
-      calificacion: _calificacion,
-      nutritionalInfo: nutritionalMap,
-      categoria: _selectedCategoria!, // Use selected value
-      gastronomia: _selectedGastronomia!, // Use selected value
-      pasos: pasos,
-    );
+    setState(() => _isSaving = true);
+    String? imageUrl;
 
     try {
-      // Assuming agregarReceta is an async function that adds to Firestore
+      final fileName = DateTime.now().millisecondsSinceEpoch.toString() + "_" + _selectedImageFile!.path.split('/').last;
+      final destination = 'recetas_imagenes/$fileName';
+      imageUrl = await _storageService.subirArchivo(_selectedImageFile!, destination);
+
+      if (imageUrl == null) {
+        throw Exception("Error al subir la imagen.");
+      }
+
+      List<String> ingredientesFinal = _ingredients.map((i) => i.selected!.nombre).toList();
+      List<String> pasos = _stepControllers.map((c) => c.text.trim()).toList();
+      int tiempoMinutos = int.tryParse(_tiempoController.text) ?? 0;
+      Map<String, dynamic> nutritionalMap = _totalInfo.toMap();
+
+      Receta nuevaReceta = Receta(
+        id: '',
+        nombre: _nombreController.text.trim(),
+        urlImagen: imageUrl,
+        ingredientes: ingredientesFinal,
+        descripcion: _descripcionController.text.trim(),
+        tiempoMinutos: tiempoMinutos,
+        calificacion: _calificacion,
+        nutritionalInfo: nutritionalMap,
+        categoria: _selectedCategoria!,
+        gastronomia: _selectedGastronomia!,
+        pasos: pasos,
+      );
+
       await agregarReceta(nuevaReceta);
-      if (!mounted) return; // Check if widget is still mounted after async call
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Receta creada exitosamente")),
       );
-      Navigator.pop(context); // Go back after successful save
+      Navigator.pop(context);
     } catch (e) {
       print("Error saving recipe: $e");
       if (!mounted) return;
@@ -330,7 +348,7 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isSaving = false); // Reset saving flag
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -343,20 +361,14 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Crear Nueva Receta"),
-        // backgroundColor: colorScheme.surface, // Uses theme default
       ),
-      // Removed Container with gradient
       body: SingleChildScrollView(
-        // Make the whole body scrollable
         padding: const EdgeInsets.all(16.0),
         child: Form(
-          // Form wraps the content
           key: _formKey,
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch, // Stretch children horizontally
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Use Card for grouping form fields - M3 style
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -380,33 +392,80 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                             : null,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _urlImagenController,
-                        decoration: const InputDecoration(
-                            labelText: "URL de la imagen"),
-                        keyboardType: TextInputType.url,
-                        validator: (value) {
-                          // Basic URL validation
-                          if (value == null || value.isEmpty) {
-                            return "Ingresa la URL";
-                          }
-                          final uri = Uri.tryParse(value);
-                          // Allow relative paths or check for scheme if needed
-                          if (uri == null ||
-                              (!uri.hasScheme && !uri.path.isNotEmpty) ||
-                              (uri.hasScheme &&
-                                  !['http', 'https'].contains(uri.scheme))) {
-                            return "URL no válida";
-                          }
-                          return null;
-                        },
+                      Text("Imagen de la Receta", style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            showModalBottomSheet(
+                                context: context,
+                                builder: (BuildContext bc) {
+                                  return SafeArea(
+                                    child: Wrap(
+                                      children: <Widget>[
+                                        ListTile(
+                                            leading: const Icon(Icons.photo_library),
+                                            title: const Text('Galería'),
+                                            onTap: () {
+                                              _pickImage(ImageSource.gallery);
+                                              Navigator.of(context).pop();
+                                            }),
+                                        ListTile(
+                                          leading: const Icon(Icons.photo_camera),
+                                          title: const Text('Cámara'),
+                                          onTap: () {
+                                            _pickImage(ImageSource.camera);
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                });
+                          },
+                          child: Container(
+                            height: 180,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: _selectedImageFile == null
+                                      ? colorScheme.outlineVariant
+                                      : Colors.transparent,
+                                  width: _selectedImageFile == null ? 1 : 0),
+                            ),
+                            child: _selectedImageFile != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: Image.file(
+                                      _selectedImageFile!,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_a_photo_outlined,
+                                          size: 48,
+                                          color: colorScheme.primary),
+                                      const SizedBox(height: 8),
+                                      Text("Toca para seleccionar imagen",
+                                          style: textTheme.bodyMedium?.copyWith(
+                                              color: colorScheme.onSurfaceVariant)),
+                                    ],
+                                  ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _descripcionController,
                         decoration:
                             const InputDecoration(labelText: "Descripción"),
-                        maxLines: 3, // Allow more lines for description
+                        maxLines: 3,
                         keyboardType: TextInputType.multiline,
                         validator: (value) => value == null || value.isEmpty
                             ? "Ingresa la descripción"
@@ -417,7 +476,7 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                         controller: _tiempoController,
                         decoration: const InputDecoration(
                             labelText: "Tiempo de Preparación (min)"),
-                        keyboardType: TextInputType.number, // Use number keyboard
+                        keyboardType: TextInputType.number,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return "Ingresa el tiempo";
@@ -495,14 +554,13 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                     ]
                         .animate(interval: 100.ms)
                         .fadeIn(duration: 300.ms)
-                        .slideX(begin: -0.1), // Animate fields
+                        .slideX(begin: -0.1),
                   ),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // --- Ingredients Section ---
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -524,8 +582,8 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                           TextButton.icon(
                             icon:
                                 const Icon(Icons.add_circle_outline, size: 20),
-                            label: const Text(""), // Label is empty, that's fine
-                            onPressed: _addIngredient, // Change this from _addStep
+                            label: const Text(""),
+                            onPressed: _addIngredient,
                             style: TextButton.styleFrom(
                                 foregroundColor: colorScheme.primary),
                           ),
@@ -535,7 +593,7 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                       ListView.builder(
                         shrinkWrap: true,
                         physics:
-                            const NeverScrollableScrollPhysics(), // Important for nested lists
+                            const NeverScrollableScrollPhysics(),
                         itemCount: _ingredients.length,
                         itemBuilder: (context, index) {
                           return _buildIngredientRow(index)
@@ -550,7 +608,6 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
 
               const SizedBox(height: 20),
 
-              // --- Steps Section ---
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -571,7 +628,7 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                             icon:
                                 const Icon(Icons.add_circle_outline, size: 20),
                             label: const Text(""),
-                            onPressed: _addStep, // This one correctly calls _addStep
+                            onPressed: _addStep,
                             style: TextButton.styleFrom(
                                 foregroundColor: colorScheme.primary),
                           ),
@@ -595,7 +652,6 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
 
               const SizedBox(height: 20),
 
-              // --- Macros and Rating Section ---
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(

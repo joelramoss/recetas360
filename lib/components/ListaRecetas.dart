@@ -12,6 +12,7 @@ import 'package:recetas360/pagines/RecetasFavoritas.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // Asegúrate de tener esta importación
 
 // Current User's Login: joelramoss
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:49:18
@@ -225,18 +226,35 @@ class _ListaRecetasState extends State<ListaRecetas> {
   }
 
   // --- Helper: Delete Recipe ---
-  Future<void> _deleteRecipe(BuildContext context, String recipeId) async {
+  Future<void> _deleteRecipe(BuildContext context, Receta receta) async {
     final colorScheme = Theme.of(context).colorScheme;
+    final String recipeId = receta.id;
+    final String imageUrl = receta.urlImagen;
+
     try {
+      // 1. Eliminar el documento de Firestore
       await FirebaseFirestore.instance
           .collection('recetas')
           .doc(recipeId)
           .delete();
+
+      // 2. Eliminar la imagen de Firebase Storage
+      if (imageUrl.isNotEmpty) {
+        try {
+          Reference photoRef = FirebaseStorage.instance.refFromURL(imageUrl);
+          await photoRef.delete();
+          print("Imagen eliminada de Storage: $imageUrl");
+        } catch (e) {
+          print(
+              "Error al eliminar imagen de Storage ($imageUrl): $e. Puede que necesites guardar la ruta de Storage en Firestore para una eliminación más fiable o que la URL no sea compatible con refFromURL.");
+        }
+      }
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Receta eliminada.")));
     } catch (e) {
-      print("Error deleting recipe: $e");
+      print("Error deleting recipe document: $e");
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -520,7 +538,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                         await _showDeleteConfirmationDialog(
                                             context);
                                     if (confirm == true) {
-                                      _deleteRecipe(context, receta.id);
+                                      _deleteRecipe(context, receta);
                                     }
                                   },
                                   visualDensity: VisualDensity.compact,

@@ -105,33 +105,6 @@ class PaginaAjustes extends StatelessWidget {
                        );
                      },
                    ),
-                   Divider(height: 1, indent: 16, endIndent: 16, color: colorScheme.outlineVariant.withOpacity(0.5)), // Themed divider
-                   _buildSettingsTile(
-                     context: context,
-                     icon: Icons.notifications_none_rounded,
-                     title: 'Notificaciones',
-                     onTap: () { /* TODO: Navigate to Notifications settings */
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pantalla de Notificaciones (pendiente)")));
-                     },
-                   ),
-                    Divider(height: 1, indent: 16, endIndent: 16, color: colorScheme.outlineVariant.withOpacity(0.5)),
-                    _buildSettingsTile(
-                     context: context,
-                     icon: Icons.language_rounded,
-                     title: 'Idioma',
-                      onTap: () { /* TODO: Navigate to Language settings */
-                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pantalla de Idioma (pendiente)")));
-                      },
-                   ),
-                    Divider(height: 1, indent: 16, endIndent: 16, color: colorScheme.outlineVariant.withOpacity(0.5)),
-                     _buildSettingsTile(
-                     context: context,
-                     icon: Icons.help_outline_rounded,
-                     title: 'Ayuda y Soporte',
-                     onTap: () { /* TODO: Navigate to Help/Support */
-                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pantalla de Ayuda (pendiente)")));
-                     },
-                   ),
                 ],
               ),
             ).animate().fadeIn(delay: 200.ms), // Animate card

@@ -1,16 +1,16 @@
+import 'dart:io'; // Necesario para File
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart'; // Para seleccionar imágenes
+import 'package:firebase_storage/firebase_storage.dart'; // Para Firebase Storage
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/producto.dart';
-import 'package:recetas360/components/selecciondeproducto.dart'; // Assuming this is updated for M3
-import 'package:recetas360/components/nutritionalifno.dart'; // Assuming this exists
+import 'package:recetas360/components/selecciondeproducto.dart';
+import 'package:recetas360/components/nutritionalifno.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:recetas360/FirebaseServices.dart'; // Asumo que tienes tu StorageService aquí
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:55:03
-
-
-// --- Ingredient Selection Helper Class (remains the same logic) ---
+// --- Ingredient Selection Helper Class ---
 class IngredientSelection {
   String name;
   Producto? selected;
@@ -36,50 +36,51 @@ class EditarReceta extends StatefulWidget {
 class _EditarRecetaState extends State<EditarReceta> {
   final _formKey = GlobalKey<FormState>();
 
-  // --- Controllers ---
   late TextEditingController _nombreController;
-  late TextEditingController _urlImagenController;
   late TextEditingController _descripcionController;
   late TextEditingController _tiempoController;
   late TextEditingController _categoriaController;
   late TextEditingController _gastronomiaController;
+
   List<IngredientSelection> _ingredients = [];
   List<TextEditingController> _stepControllers = [];
-  double _calificacion = 3.0; // Use double for Slider
+  double _calificacion = 3.0;
 
-  // --- State ---
+  File? _selectedImageFile; // Para la nueva imagen seleccionada
+  String? _currentImageUrl; // Para la URL de la imagen existente
+  final ImagePicker _picker = ImagePicker();
+  final StorageService _storageService = StorageService(); // Tu servicio de Storage
+
   bool _isSaving = false;
-  NutritionalInfo _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0); // Initialize with zeros
+  NutritionalInfo _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
 
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with existing recipe data
     _nombreController = TextEditingController(text: widget.receta.nombre);
-    _urlImagenController = TextEditingController(text: widget.receta.urlImagen);
+    _currentImageUrl = widget.receta.urlImagen; // Guardar la URL actual
     _descripcionController = TextEditingController(text: widget.receta.descripcion);
     _tiempoController = TextEditingController(text: widget.receta.tiempoMinutos.toString());
     _categoriaController = TextEditingController(text: widget.receta.categoria);
     _gastronomiaController = TextEditingController(text: widget.receta.gastronomia);
-    _calificacion = widget.receta.calificacion.toDouble(); // Convert int to double
+    _calificacion = widget.receta.calificacion.toDouble();
 
     _ingredients = widget.receta.ingredientes
-        .map((name) => IngredientSelection(name: name, selected: null)) // Product info needs re-fetching if needed
+        .map((name) => IngredientSelection(name: name, selected: null))
         .toList();
-    if (_ingredients.isEmpty) _ingredients.add(IngredientSelection(name: '')); // Ensure one
+    if (_ingredients.isEmpty) _ingredients.add(IngredientSelection(name: ''));
 
     _stepControllers = widget.receta.pasos
         .map((step) => TextEditingController(text: step))
         .toList();
-    if (_stepControllers.isEmpty) _stepControllers.add(TextEditingController()); // Ensure one
+    if (_stepControllers.isEmpty) _stepControllers.add(TextEditingController());
 
-    // Initialize nutritional info (consider re-calculation strategy)
     if (widget.receta.nutritionalInfo != null) {
       try {
         _totalInfo = NutritionalInfo.fromMap(widget.receta.nutritionalInfo!);
       } catch (e) {
         print("Error parsing saved nutritional info: $e");
-        _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0); // Reset on error
+        _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
       }
     } else {
        _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
@@ -89,7 +90,6 @@ class _EditarRecetaState extends State<EditarReceta> {
   @override
   void dispose() {
     _nombreController.dispose();
-    _urlImagenController.dispose();
     _descripcionController.dispose();
     _tiempoController.dispose();
     _categoriaController.dispose();
@@ -103,7 +103,31 @@ class _EditarRecetaState extends State<EditarReceta> {
     super.dispose();
   }
 
-  // --- Input Decoration Helper ---
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1024,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      print("Error al seleccionar imagen: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text("Error al seleccionar imagen: ${e.toString()}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+              backgroundColor: Theme.of(context).colorScheme.error),
+        );
+      }
+    }
+  }
+
   InputDecoration _inputDecoration({
     required BuildContext context,
     required String label,
@@ -116,16 +140,13 @@ class _EditarRecetaState extends State<EditarReceta> {
       labelText: label,
       hintText: hintText,
       prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 20) : null,
-      // Inherit border, fill color etc. from theme's inputDecorationTheme
-      // Customize density if needed
       isDense: dense,
       contentPadding: dense ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10) : null,
     );
   }
 
-  // --- Recalculate Macros ---
   void _recalcularMacros() {
-    NutritionalInfo total = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0); // Initialize with zeros
+    NutritionalInfo total = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
     for (var ing in _ingredients) {
       if (ing.selected != null) {
         total += NutritionalInfo(
@@ -140,7 +161,6 @@ class _EditarRecetaState extends State<EditarReceta> {
     setState(() => _totalInfo = total);
   }
 
-  // --- Build Ingredient Row ---
   Widget _buildIngredientRow(int index, ColorScheme colorScheme) {
     final ing = _ingredients[index];
     return Padding(
@@ -167,7 +187,7 @@ class _EditarRecetaState extends State<EditarReceta> {
                  return;
               }
               FocusScope.of(context).unfocus();
-              Producto? producto = await showProductoSelection(context, currentName); // Assumes M3 style
+              Producto? producto = await showProductoSelection(context, currentName);
               if (producto != null) {
                  setState(() => ing.selected = producto);
                  _recalcularMacros();
@@ -193,12 +213,11 @@ class _EditarRecetaState extends State<EditarReceta> {
     );
   }
 
-  // --- Build Step Row ---
   Widget _buildStepRow(int index, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start, // Align top for multiline
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: TextFormField(
@@ -213,7 +232,6 @@ class _EditarRecetaState extends State<EditarReceta> {
           IconButton(
             icon: Icon(Icons.remove_circle_outline_rounded, color: colorScheme.error),
             tooltip: "Quitar paso",
-            // Only enable remove if more than one step exists
             onPressed: _isSaving || _stepControllers.length <= 1 ? null : () {
                setState(() => _stepControllers.removeAt(index).dispose());
             },
@@ -224,11 +242,9 @@ class _EditarRecetaState extends State<EditarReceta> {
     );
   }
 
-  // --- Add Ingredient/Step ---
   void _addIngredient() => setState(() => _ingredients.add(IngredientSelection(name: '')));
   void _addStep() => setState(() => _stepControllers.add(TextEditingController()));
 
-  // --- Section Header Helper ---
    Widget _buildSectionHeader(BuildContext context, String title) {
      return Padding(
        padding: const EdgeInsets.only(top: 24.0, bottom: 8.0),
@@ -242,7 +258,6 @@ class _EditarRecetaState extends State<EditarReceta> {
      );
    }
 
-  // --- Update Recipe Logic ---
   Future<void> _updateReceta() async {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -250,26 +265,61 @@ class _EditarRecetaState extends State<EditarReceta> {
       );
       return;
     }
-    if (_isSaving) return;
 
+    if (_isSaving) return;
     setState(() => _isSaving = true);
     final colorScheme = Theme.of(context).colorScheme;
 
-    List<String> ingredientesFinal = _ingredients.map((ing) => ing.controller.text.trim()).where((name) => name.isNotEmpty).toList();
-    List<String> pasosFinal = _stepControllers.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
-    Map<String, dynamic> nutritionalMap = _totalInfo.toMap();
+    // Inicia con la URL actual o una cadena vacía si no hay imagen actual.
+    String finalImageUrl = _currentImageUrl ?? '';
 
     try {
+      // Si el usuario seleccionó un nuevo archivo de imagen
+      if (_selectedImageFile != null) {
+        print("Procesando nueva imagen seleccionada...");
+
+        // Paso 1: Intentar eliminar la imagen antigua si existía.
+        if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
+          print("Intentando eliminar imagen antigua: $_currentImageUrl");
+          await _storageService.eliminarArchivoPorUrl(_currentImageUrl!);
+        }
+
+        // Paso 2: Subir la nueva imagen.
+        final uniqueFileName = DateTime.now().millisecondsSinceEpoch.toString() + "_" + _selectedImageFile!.path.split('/').last;
+        final destinationPath = 'recetas_imagenes/$uniqueFileName'; // Asegúrate que esta ruta coincide con tus reglas de Storage
+
+        print("Subiendo nueva imagen a: $destinationPath");
+        String? uploadedFileUrl = await _storageService.subirArchivo(_selectedImageFile!, destinationPath);
+
+        if (uploadedFileUrl != null && uploadedFileUrl.isNotEmpty) {
+          finalImageUrl = uploadedFileUrl;
+          print("Nueva imagen subida exitosamente: $finalImageUrl");
+        } else {
+          throw Exception("Error al subir la nueva imagen. El servicio de subida no devolvió una URL válida.");
+        }
+      }
+
+      // Paso 3: Verificar si hay una URL de imagen final.
+      if (finalImageUrl.isEmpty) {
+        throw Exception("La receta debe tener una imagen.");
+      }
+
+      // Preparar los datos para Firestore
+      List<String> ingredientesFinal = _ingredients.map((ing) => ing.controller.text.trim()).where((name) => name.isNotEmpty).toList();
+      List<String> pasosFinal = _stepControllers.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
+      Map<String, dynamic> nutritionalMap = _totalInfo.toMap();
+
       final docRef = FirebaseFirestore.instance.collection('recetas').doc(widget.receta.id);
 
+      print("Actualizando documento de receta en Firestore con URL de imagen: $finalImageUrl");
       await docRef.update({
         'nombre': _nombreController.text.trim(),
-        'urlImagen': _urlImagenController.text.trim(),
+        'urlImagen': finalImageUrl,
         'descripcion': _descripcionController.text.trim(),
         'tiempoMinutos': int.tryParse(_tiempoController.text.trim()) ?? widget.receta.tiempoMinutos,
         'categoria': _categoriaController.text.trim(),
         'gastronomia': _gastronomiaController.text.trim(),
-        'calificacion': _calificacion.round(), // Save rating as int
+        'calificacion': _calificacion.round(),
         'ingredientes': ingredientesFinal,
         'pasos': pasosFinal,
         'nutritionalInfo': nutritionalMap,
@@ -283,19 +333,24 @@ class _EditarRecetaState extends State<EditarReceta> {
       Navigator.pop(context);
 
     } catch (e) {
-      print("Error updating recipe: $e");
+      print("Error detallado al actualizar receta: $e");
+      if (e is FirebaseException) {
+        print("Detalles de FirebaseException: Código: ${e.code}, Mensaje: ${e.message}");
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al actualizar: ${e.toString()}', style: TextStyle(color: colorScheme.onError)),
+          content: Text('Error al actualizar la receta: ${e.toString()}', style: TextStyle(color: colorScheme.onError)),
           backgroundColor: colorScheme.error,
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {
-       if (mounted) setState(() => _isSaving = false);
+       if (mounted) {
+         setState(() => _isSaving = false);
+       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -305,15 +360,12 @@ class _EditarRecetaState extends State<EditarReceta> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Editar Receta"),
-        // Optional: Add a delete action here if desired
-        // actions: [ IconButton(...) ]
       ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            // --- Basic Info ---
             _buildSectionHeader(context, "Información Básica"),
             TextFormField(
               controller: _nombreController,
@@ -322,19 +374,109 @@ class _EditarRecetaState extends State<EditarReceta> {
                enabled: !_isSaving, textCapitalization: TextCapitalization.sentences,
             ).animate().fadeIn(delay: 100.ms),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _urlImagenController,
-              decoration: _inputDecoration(context: context, label: "URL Imagen", icon: Icons.image_rounded),
-              keyboardType: TextInputType.url, enabled: !_isSaving,
+
+            Text("Imagen de la Receta", style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 8),
+            Center(
+              child: GestureDetector(
+                onTap: _isSaving ? null : () {
+                  showModalBottomSheet(
+                      context: context,
+                      builder: (BuildContext bc) {
+                        return SafeArea(
+                          child: Wrap(
+                            children: <Widget>[
+                              ListTile(
+                                  leading: const Icon(Icons.photo_library),
+                                  title: const Text('Galería'),
+                                  onTap: () {
+                                    _pickImage(ImageSource.gallery);
+                                    Navigator.of(context).pop();
+                                  }),
+                              ListTile(
+                                leading: const Icon(Icons.photo_camera),
+                                title: const Text('Cámara'),
+                                onTap: () {
+                                  _pickImage(ImageSource.camera);
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              if (_selectedImageFile != null)
+                                ListTile(
+                                  leading: Icon(Icons.delete_outline, color: colorScheme.error),
+                                  title: Text('Quitar imagen nueva', style: TextStyle(color: colorScheme.error)),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedImageFile = null;
+                                    });
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                            ],
+                          ),
+                        );
+                      });
+                },
+                child: Container(
+                  height: 180,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: (_selectedImageFile == null && (_currentImageUrl == null || _currentImageUrl!.isEmpty))
+                            ? colorScheme.outlineVariant
+                            : Colors.transparent,
+                        width: 1),
+                  ),
+                  child: _selectedImageFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child: Image.file(
+                            _selectedImageFile!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                        )
+                      : (_currentImageUrl != null && _currentImageUrl!.isNotEmpty)
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(11),
+                              child: Image.network(
+                                _currentImageUrl!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (context, error, stackTrace) =>
+                                  const Center(child: Icon(Icons.broken_image_outlined, size: 48)),
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const Center(child: CircularProgressIndicator());
+                                },
+                              ),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_a_photo_outlined,
+                                    size: 48,
+                                    color: colorScheme.primary),
+                                const SizedBox(height: 8),
+                                Text("Toca para seleccionar imagen",
+                                    style: textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.onSurfaceVariant)),
+                              ],
+                            ),
+                ),
+              ),
             ).animate().fadeIn(delay: 150.ms),
-             const SizedBox(height: 12),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _descripcionController,
               decoration: _inputDecoration(context: context, label: "Descripción", icon: Icons.description_outlined),
               maxLines: 3, enabled: !_isSaving, textCapitalization: TextCapitalization.sentences,
             ).animate().fadeIn(delay: 200.ms),
              const SizedBox(height: 12),
-             // --- Time & Rating ---
              Row(
                crossAxisAlignment: CrossAxisAlignment.start,
                children: [
@@ -361,9 +503,6 @@ class _EditarRecetaState extends State<EditarReceta> {
                            value: _calificacion,
                            min: 0, max: 5, divisions: 5,
                            label: _calificacion.round().toString(),
-                           // Use theme colors automatically
-                           // activeColor: colorScheme.primary,
-                           // inactiveColor: colorScheme.primary.withOpacity(0.3),
                            onChanged: _isSaving ? null : (value) => setState(() => _calificacion = value),
                          ).animate().fadeIn(delay: 300.ms),
                        ],
@@ -372,7 +511,6 @@ class _EditarRecetaState extends State<EditarReceta> {
                ],
              ),
             const SizedBox(height: 12),
-            // --- Category & Gastronomy ---
             Row(
               children: [
                  Expanded(
@@ -380,6 +518,7 @@ class _EditarRecetaState extends State<EditarReceta> {
                        controller: _categoriaController,
                        decoration: _inputDecoration(context: context, label: "Categoría", icon: Icons.category_outlined),
                         enabled: !_isSaving, textCapitalization: TextCapitalization.words,
+                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ).animate().fadeIn(delay: 350.ms),
                  ),
                  const SizedBox(width: 16),
@@ -388,12 +527,12 @@ class _EditarRecetaState extends State<EditarReceta> {
                        controller: _gastronomiaController,
                        decoration: _inputDecoration(context: context, label: "Gastronomía", icon: Icons.public_rounded),
                         enabled: !_isSaving, textCapitalization: TextCapitalization.words,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ).animate().fadeIn(delay: 400.ms),
                  ),
               ],
             ),
 
-            // --- Ingredients ---
             _buildSectionHeader(context, "Ingredientes"),
             ...List.generate(_ingredients.length, (index) => _buildIngredientRow(index, colorScheme))
                 .animate(interval: 50.ms).fadeIn().slideX(begin: -0.1),
@@ -407,7 +546,6 @@ class _EditarRecetaState extends State<EditarReceta> {
               ),
             ),
 
-            // --- Steps ---
             _buildSectionHeader(context, "Pasos"),
              ...List.generate(_stepControllers.length, (index) => _buildStepRow(index, colorScheme))
                  .animate(interval: 50.ms).fadeIn().slideX(begin: -0.1),
@@ -421,32 +559,30 @@ class _EditarRecetaState extends State<EditarReceta> {
               ),
             ),
 
-             // --- Macros ---
              _buildSectionHeader(context, "Información Nutricional (Estimada)"),
-             Card( // Display macros in a card
+             Card(
                 elevation: 0,
                 color: colorScheme.secondaryContainer.withOpacity(0.4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                  child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Text(
-                      _totalInfo.toString(), // Use toString method from NutritionalInfo
+                      _totalInfo.toString(),
                       style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSecondaryContainer),
                     ),
                  ),
              ).animate().fadeIn(delay: 500.ms),
              const SizedBox(height: 32),
 
-            // --- Save Button ---
             ElevatedButton.icon(
               icon: _isSaving ? Container(width: 20, height: 20, margin: const EdgeInsets.only(right: 8), child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary)) : const Icon(Icons.save_rounded),
               label: Text(_isSaving ? 'Guardando...' : 'Guardar Cambios'),
               style: ElevatedButton.styleFrom(
-                 minimumSize: const Size(double.infinity, 50), // Full width button
-                 // Inherit colors from theme
+                 minimumSize: const Size(double.infinity, 50),
               ),
               onPressed: _isSaving ? null : _updateReceta,
             ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.5),
+            const SizedBox(height: 20),
           ],
         ),
       ),

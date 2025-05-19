@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/serveis/UsuarioUtil.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
+import 'package:flutter_animate/flutter_animate.dart'; // Importar flutter_animate
 
 class CarritoFaltantes extends StatefulWidget {
   const CarritoFaltantes({Key? key}) : super(key: key);
@@ -29,7 +30,6 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
     String? userId = _usuarioUtil.getUidUsuarioActual();
     if (userId == null) return;
     
-    // Verificar si este es el último ingrediente faltante
     final ingredientesFaltantes = _ingredientesFaltantesPorReceta[recetaId] ?? {};
     ingredientesFaltantes[ingrediente] = nuevoEstado;
     
@@ -41,22 +41,18 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
         
     try {
       if (nuevoEstado) {
-        // Si el ingrediente ahora es faltante, lo actualizamos/agregamos
         await docRef.set({
           'ingredientes': {ingrediente: true},
           'actualizadoEn': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } else {
-        // Si el ingrediente ya no es faltante, lo eliminamos del documento
         await docRef.update({
           'ingredientes.$ingrediente': FieldValue.delete(),
         });
         
-        // Verificamos si quedan ingredientes faltantes
         final sigueHabiendoFaltantes = ingredientesFaltantes.values.any((faltante) => faltante);
         
         if (!sigueHabiendoFaltantes) {
-          // Si no quedan ingredientes faltantes, eliminamos el documento completo
           await docRef.delete();
           setState(() {
             _ingredientesFaltantesPorReceta.remove(recetaId);
@@ -65,68 +61,48 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
       }
     } catch (e) {
       print("Error al actualizar el ingrediente: $e");
-      // Aquí podrías mostrar un SnackBar con el error
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.orangeAccent,
-        title: const Text('Carrito de compra'),
+        // backgroundColor: Colors.orangeAccent, // Se usará el color del tema
+        title: const Text('Carrito de Compra'), // Título más descriptivo
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.orangeAccent,
-              Colors.pink.shade100,
-            ],
-          ),
-        ),
-        child: Column(
+      body: Column( // Mantenemos Column para la estructura general
           children: [
-            Container(
-              width: double.infinity,
-              height: 50,
-              child: const Center(
-                child: Text(
-                  "Ingredientes Faltantes en tus Recetas",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black45,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
+            Padding( // Usamos Padding como en PantallaGastronomias
+              padding:
+                  const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+              child: Text(
+                "Ingredientes Faltantes", // Título más corto y directo
+                style: textTheme.headlineMedium?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
                 ),
-              ),
+                textAlign: TextAlign.center,
+              ).animate().fadeIn(delay: 200.ms, duration: 500.ms), // Animación
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _cargarRecetasFaltantes(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(child: CircularProgressIndicator(color: colorScheme.primary));
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
-                        "No hay recetas con ingredientes faltantes",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
+                        "No hay ingredientes faltantes en tus recetas.",
+                        style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                        textAlign: TextAlign.center,
+                      ).animate().fadeIn(delay: 100.ms),
                     );
                   }
 
@@ -138,19 +114,17 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                   }).toList();
 
                   if (recetasConFaltantes.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         "¡No te falta nada en tus recetas!",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
+                        style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                        textAlign: TextAlign.center,
+                      ).animate().fadeIn(delay: 100.ms),
                     );
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Padding ajustado
                     itemCount: recetasConFaltantes.length,
                     itemBuilder: (context, index) {
                       final doc = recetasConFaltantes[index];
@@ -162,56 +136,57 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                           .toList();
 
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
+                        margin: const EdgeInsets.only(bottom: 12), // Margen ajustado
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        elevation: 4,
+                        elevation: 2, // Elevación sutil
+                        clipBehavior: Clip.antiAlias, // Para que el ExpansionTile respete el borde
                         child: ExpansionTile(
+                          backgroundColor: colorScheme.surfaceContainerLowest, // Color de fondo para el tile expandido
+                          collapsedBackgroundColor: colorScheme.surface, // Color de fondo para el tile colapsado
+                          iconColor: colorScheme.primary,
+                          collapsedIconColor: colorScheme.onSurfaceVariant,
                           title: Text(
                             data['recetaNombre'] ?? 'Receta sin nombre',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
+                            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           children: faltantes.map((ingrediente) {
                             return ListTile(
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                                horizontal: 24, // Aumentar padding horizontal para los items
                                 vertical: 8,
                               ),
                               leading: CircleAvatar(
                                 backgroundColor: ingredientes[ingrediente] == true
-                                    ? Colors.redAccent
-                                    : Colors.greenAccent,
+                                    ? colorScheme.errorContainer // Usar colores del tema
+                                    : colorScheme.primaryContainer,
                                 child: Icon(
                                   ingredientes[ingrediente] == true
-                                      ? Icons.local_grocery_store
-                                      : Icons.check,
-                                  color: Colors.white,
+                                      ? Icons.remove_shopping_cart_outlined // Icono más representativo
+                                      : Icons.check_circle_outline_rounded,
+                                  color: ingredientes[ingrediente] == true
+                                      ? colorScheme.onErrorContainer
+                                      : colorScheme.onPrimaryContainer,
                                 ),
                               ),
-                              title: Text(ingrediente),
+                              title: Text(ingrediente, style: textTheme.bodyLarge),
                               onTap: () {
-                                // Guardar el estado actual
                                 final estadoActual = ingredientes[ingrediente] ?? true;
-                                // Actualizar el estado local
                                 setState(() {
                                   ingredientes[ingrediente] = !estadoActual;
                                 });
-                                // Actualizar en Firestore (usando el valor opuesto al actual)
                                 _actualizarIngrediente(doc.id, ingrediente, !estadoActual);
                               },
                               onLongPress: () {
                                 FirebaseFirestore.instance
                                     .collection('recetas')
-                                    .doc(doc.id)
+                                    .doc(doc.id) // Usar doc.id que es el ID de la receta faltante, no el nombre
                                     .get()
                                     .then((recetaDoc) {
                                   if (recetaDoc.exists) {
                                     final recetaData = recetaDoc.data()!;
-                                    recetaData['id'] = recetaDoc.id;
+                                    // recetaData['id'] = recetaDoc.id; // El ID ya está en recetaDoc.id
 
                                     Navigator.push(
                                       context,
@@ -223,63 +198,62 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
                                     );
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Esta receta ya no está disponible'),
+                                      SnackBar(
+                                        content: Text('Esta receta ya no está disponible', style: TextStyle(color: colorScheme.onError)),
+                                        backgroundColor: colorScheme.error,
                                       ),
                                     );
                                   }
                                 }).catchError((error) {
                                   print("Error al cargar detalles de receta: $error");
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Error al cargar la receta'),
+                                    SnackBar(
+                                      content: Text('Error al cargar la receta', style: TextStyle(color: colorScheme.onError)),
+                                      backgroundColor: colorScheme.error,
                                     ),
                                   );
                                 });
                               },
                             );
-                          }).toList(),
+                          }).toList().animate(interval: 50.ms).fadeIn().slideX(begin: 0.1), // Animación para los items
                         ),
-                      );
+                      ).animate().fadeIn(delay: (index * 50).ms, duration: 300.ms).slideY(begin: 0.1); // Animación para las tarjetas
                     },
                   );
                 },
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              width: double.infinity,
-              child: ElevatedButton(
+            Padding( // Padding para el botón
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon( // Cambiado a ElevatedButton.icon
+                icon: const Icon(Icons.send_rounded), // Icono para el botón
+                label: const Text(
+                  'Enviar Información',
+                  // style: textTheme.labelLarge?.copyWith(color: colorScheme.onPrimary), // Estilo del tema
+                ),
                 onPressed: () {
-                  // Placeholder action: muestra un SnackBar
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Información enviada (funcionalidad placeholder)'),
+                    SnackBar(
+                      content: const Text('Información enviada (funcionalidad placeholder)'),
+                      backgroundColor: colorScheme.secondaryContainer,
+                      behavior: SnackBarBehavior.floating, // Estilo flotante
                     ),
                   );
-                  // Aquí puedes agregar la lógica para enviar la información
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: colorScheme.primary, // Usar color primario del tema
+                  foregroundColor: colorScheme.onPrimary,
+                  minimumSize: const Size(double.infinity, 50), // Botón más ancho
+                  // padding: const EdgeInsets.symmetric(vertical: 16), // Padding ya aplicado por minimumSize
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 4,
+                  elevation: 2,
                 ),
-                child: const Text(
-                  'Enviar Información',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2), // Animación para el botón
             ),
           ],
         ),
-      ),
     );
   }
 }
