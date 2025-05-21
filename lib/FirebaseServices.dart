@@ -1,7 +1,8 @@
-import 'dart:io'; // Necesario para la clase File
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // Necesario para Firebase Storage
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_analytics/firebase_analytics.dart'; // Necesario para el log de errores
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -74,6 +75,75 @@ class FirebaseService {
     } catch (e) {
       print('Error al obtener recetas favoritas: $e');
       return [];
+    }
+  }
+
+  Future<void> actualizarNombresEnComentariosGlobal() async { // Renombrado para evitar conflicto si se llama desde main
+    try {
+      QuerySnapshot recetasSnapshot =
+          await _firestore.collection('recetas').get();
+
+      WriteBatch batch = _firestore.batch();
+      int batchCounter = 0;
+
+      for (var recetaDoc in recetasSnapshot.docs) {
+        QuerySnapshot comentariosSnapshot =
+            await recetaDoc.reference.collection('comentarios').get();
+
+        for (var comentarioDoc in comentariosSnapshot.docs) {
+          final data = comentarioDoc.data() as Map<String, dynamic>?;
+
+          if (data != null &&
+              data.containsKey('usuarioId') &&
+              (!data.containsKey('usuarioNombre') ||
+                  data['usuarioNombre'] == 'Usuario desconocido')) {
+            String usuarioId = data['usuarioId'];
+            DocumentSnapshot userDoc =
+                await _firestore.collection('usuarios').doc(usuarioId).get();
+
+            if (userDoc.exists) {
+              String nombreUsuario =
+                  (userDoc.data() as Map<String, dynamic>?)?['nombre'] ??
+                      'Usuario desconocido';
+              batch.update(
+                  comentarioDoc.reference, {'usuarioNombre': nombreUsuario});
+              batchCounter++;
+            } else {
+              batch.update(
+                  comentarioDoc.reference, {'usuarioNombre': 'Usuario eliminado'});
+              batchCounter++;
+            }
+
+            if (batchCounter >= 400) {
+              await batch.commit();
+              batch = _firestore.batch();
+              batchCounter = 0;
+            }
+          } else if (data == null || !data.containsKey('usuarioId')) {
+            print(
+                'Comentario sin usuarioId o data null: ${comentarioDoc.id} en receta ${recetaDoc.id}');
+          }
+        }
+      }
+
+      if (batchCounter > 0) {
+        await batch.commit();
+      }
+
+      print('Actualización de nombres en comentarios completada (desde FirebaseService).');
+      await _firestore
+          .collection('configuraciones')
+          .doc('actualizacion_nombres')
+          .set({'completada': true});
+      print('Marca de actualización de nombres en comentarios establecida (desde FirebaseService).');
+    } catch (e) {
+      print('Error al actualizar nombres en comentarios (desde FirebaseService): $e');
+      FirebaseAnalytics.instance.logEvent( // Asumiendo que tienes analytics configurado
+        name: 'error_actualizar_comentarios_global',
+        parameters: {'error': e.toString()},
+      );
+      // Re-throw para que el llamador pueda manejarlo si es necesario
+      // o manejarlo de forma diferente aquí.
     }
   }
 } // Fin de la clase FirebaseService

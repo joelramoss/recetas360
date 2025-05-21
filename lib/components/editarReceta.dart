@@ -1,14 +1,14 @@
 import 'dart:io'; // Necesario para File
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart'; // Para seleccionar imágenes
-import 'package:firebase_storage/firebase_storage.dart'; // Para Firebase Storage
+import 'package:recetas360/FirebaseServices.dart';
+import 'package:recetas360/serveis/kInputDecoration.dart';
+import 'package:recetas360/serveis/ImagePickerService.dart'; // Importar
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/producto.dart';
 import 'package:recetas360/components/selecciondeproducto.dart';
 import 'package:recetas360/components/nutritionalifno.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:recetas360/FirebaseServices.dart'; // Asumo que tienes tu StorageService aquí
 
 // --- Ingredient Selection Helper Class ---
 class IngredientSelection {
@@ -46,10 +46,10 @@ class _EditarRecetaState extends State<EditarReceta> {
   List<TextEditingController> _stepControllers = [];
   double _calificacion = 3.0;
 
-  File? _selectedImageFile; // Para la nueva imagen seleccionada
-  String? _currentImageUrl; // Para la URL de la imagen existente
-  final ImagePicker _picker = ImagePicker();
-  final StorageService _storageService = StorageService(); // Tu servicio de Storage
+  File? _selectedImageFile;
+  String? _currentImageUrl;
+  final StorageService _storageService = StorageService();
+  final ImagePickerService _imagePickerService = ImagePickerService(); // Instancia del servicio
 
   bool _isSaving = false;
   NutritionalInfo _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
@@ -58,7 +58,7 @@ class _EditarRecetaState extends State<EditarReceta> {
   void initState() {
     super.initState();
     _nombreController = TextEditingController(text: widget.receta.nombre);
-    _currentImageUrl = widget.receta.urlImagen; // Guardar la URL actual
+    _currentImageUrl = widget.receta.urlImagen;
     _descripcionController = TextEditingController(text: widget.receta.descripcion);
     _tiempoController = TextEditingController(text: widget.receta.tiempoMinutos.toString());
     _categoriaController = TextEditingController(text: widget.receta.categoria);
@@ -103,48 +103,6 @@ class _EditarRecetaState extends State<EditarReceta> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        imageQuality: 70,
-        maxWidth: 1024,
-      );
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      print("Error al seleccionar imagen: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("Error al seleccionar imagen: ${e.toString()}",
-                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
-    }
-  }
-
-  InputDecoration _inputDecoration({
-    required BuildContext context,
-    required String label,
-    IconData? icon,
-    bool dense = false,
-    String? hintText,
-  }) {
-    final theme = Theme.of(context);
-    return InputDecoration(
-      labelText: label,
-      hintText: hintText,
-      prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 20) : null,
-      isDense: dense,
-      contentPadding: dense ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10) : null,
-    );
-  }
-
   void _recalcularMacros() {
     NutritionalInfo total = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
     for (var ing in _ingredients) {
@@ -171,7 +129,7 @@ class _EditarRecetaState extends State<EditarReceta> {
           Expanded(
             child: TextFormField(
               controller: ing.controller,
-              decoration: _inputDecoration(context: context, label: "Ingrediente ${index + 1}", dense: true),
+              decoration: kInputDecoration(context: context, labelText: "Ingrediente ${index + 1}", isDense: true),
               validator: (value) => (value == null || value.trim().isEmpty) ? 'Vacío' : null,
               onChanged: (value) => ing.name = value.trim(),
               enabled: !_isSaving,
@@ -222,7 +180,7 @@ class _EditarRecetaState extends State<EditarReceta> {
           Expanded(
             child: TextFormField(
               controller: _stepControllers[index],
-              decoration: _inputDecoration(context: context, label: "Paso ${index + 1}", dense: true),
+              decoration: kInputDecoration(context: context, labelText: "Paso ${index + 1}", isDense: true),
               validator: (value) => (value == null || value.trim().isEmpty) ? 'Vacío' : null,
               maxLines: null,
               keyboardType: TextInputType.multiline,
@@ -270,23 +228,19 @@ class _EditarRecetaState extends State<EditarReceta> {
     setState(() => _isSaving = true);
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Inicia con la URL actual o una cadena vacía si no hay imagen actual.
     String finalImageUrl = _currentImageUrl ?? '';
 
     try {
-      // Si el usuario seleccionó un nuevo archivo de imagen
       if (_selectedImageFile != null) {
         print("Procesando nueva imagen seleccionada...");
 
-        // Paso 1: Intentar eliminar la imagen antigua si existía.
         if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
           print("Intentando eliminar imagen antigua: $_currentImageUrl");
           await _storageService.eliminarArchivoPorUrl(_currentImageUrl!);
         }
 
-        // Paso 2: Subir la nueva imagen.
         final uniqueFileName = DateTime.now().millisecondsSinceEpoch.toString() + "_" + _selectedImageFile!.path.split('/').last;
-        final destinationPath = 'recetas_imagenes/$uniqueFileName'; // Asegúrate que esta ruta coincide con tus reglas de Storage
+        final destinationPath = 'recetas_imagenes/$uniqueFileName';
 
         print("Subiendo nueva imagen a: $destinationPath");
         String? uploadedFileUrl = await _storageService.subirArchivo(_selectedImageFile!, destinationPath);
@@ -299,12 +253,10 @@ class _EditarRecetaState extends State<EditarReceta> {
         }
       }
 
-      // Paso 3: Verificar si hay una URL de imagen final.
       if (finalImageUrl.isEmpty) {
         throw Exception("La receta debe tener una imagen.");
       }
 
-      // Preparar los datos para Firestore
       List<String> ingredientesFinal = _ingredients.map((ing) => ing.controller.text.trim()).where((name) => name.isNotEmpty).toList();
       List<String> pasosFinal = _stepControllers.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
       Map<String, dynamic> nutritionalMap = _totalInfo.toMap();
@@ -369,7 +321,7 @@ class _EditarRecetaState extends State<EditarReceta> {
             _buildSectionHeader(context, "Información Básica"),
             TextFormField(
               controller: _nombreController,
-              decoration: _inputDecoration(context: context, label: "Nombre", icon: Icons.restaurant_menu_rounded),
+              decoration: kInputDecoration(context: context, labelText: "Nombre de la Receta", icon: Icons.restaurant_menu_rounded), // Usar kInputDecoration
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                enabled: !_isSaving, textCapitalization: TextCapitalization.sentences,
             ).animate().fadeIn(delay: 100.ms),
@@ -379,44 +331,14 @@ class _EditarRecetaState extends State<EditarReceta> {
             const SizedBox(height: 8),
             Center(
               child: GestureDetector(
-                onTap: _isSaving ? null : () {
-                  showModalBottomSheet(
-                      context: context,
-                      builder: (BuildContext bc) {
-                        return SafeArea(
-                          child: Wrap(
-                            children: <Widget>[
-                              ListTile(
-                                  leading: const Icon(Icons.photo_library),
-                                  title: const Text('Galería'),
-                                  onTap: () {
-                                    _pickImage(ImageSource.gallery);
-                                    Navigator.of(context).pop();
-                                  }),
-                              ListTile(
-                                leading: const Icon(Icons.photo_camera),
-                                title: const Text('Cámara'),
-                                onTap: () {
-                                  _pickImage(ImageSource.camera);
-                                  Navigator.of(context).pop();
-                                },
-                              ),
-                              if (_selectedImageFile != null)
-                                ListTile(
-                                  leading: Icon(Icons.delete_outline, color: colorScheme.error),
-                                  title: Text('Quitar imagen nueva', style: TextStyle(color: colorScheme.error)),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedImageFile = null;
-                                    });
-                                    Navigator.of(context).pop();
-                                  },
-                                ),
-                            ],
-                          ),
-                        );
+                onTap: _isSaving ? null : () => _imagePickerService.showImageSourceActionSheet(
+                    context: context,
+                    onImageSelected: (file) {
+                      setState(() {
+                        _selectedImageFile = file;
                       });
-                },
+                    },
+                  ),
                 child: Container(
                   height: 180,
                   width: double.infinity,
@@ -473,7 +395,7 @@ class _EditarRecetaState extends State<EditarReceta> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _descripcionController,
-              decoration: _inputDecoration(context: context, label: "Descripción", icon: Icons.description_outlined),
+              decoration: kInputDecoration(context: context, labelText: "Descripción", icon: Icons.description_outlined), // Usar kInputDecoration
               maxLines: 3, enabled: !_isSaving, textCapitalization: TextCapitalization.sentences,
             ).animate().fadeIn(delay: 200.ms),
              const SizedBox(height: 12),
@@ -483,7 +405,7 @@ class _EditarRecetaState extends State<EditarReceta> {
                   Expanded(
                      child: TextFormField(
                         controller: _tiempoController,
-                        decoration: _inputDecoration(context: context, label: "Tiempo (min)", icon: Icons.timer_outlined),
+                        decoration: kInputDecoration(context: context, labelText: "Tiempo (min)", icon: Icons.timer_outlined), // Usar kInputDecoration
                         keyboardType: const TextInputType.numberWithOptions(decimal: false),
                          enabled: !_isSaving,
                         validator: (v) {
@@ -516,7 +438,7 @@ class _EditarRecetaState extends State<EditarReceta> {
                  Expanded(
                     child: TextFormField(
                        controller: _categoriaController,
-                       decoration: _inputDecoration(context: context, label: "Categoría", icon: Icons.category_outlined),
+                       decoration: kInputDecoration(context: context, labelText: "Categoría", icon: Icons.category_outlined), // Usar kInputDecoration
                         enabled: !_isSaving, textCapitalization: TextCapitalization.words,
                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ).animate().fadeIn(delay: 350.ms),
@@ -525,7 +447,7 @@ class _EditarRecetaState extends State<EditarReceta> {
                   Expanded(
                     child: TextFormField(
                        controller: _gastronomiaController,
-                       decoration: _inputDecoration(context: context, label: "Gastronomía", icon: Icons.public_rounded),
+                       decoration: kInputDecoration(context: context, labelText: "Gastronomía", icon: Icons.public_rounded), // Usar kInputDecoration
                         enabled: !_isSaving, textCapitalization: TextCapitalization.words,
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ).animate().fadeIn(delay: 400.ms),

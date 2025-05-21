@@ -9,6 +9,7 @@ import 'package:recetas360/pagines/PaginaLogin.dart';
 import 'firebase_options.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:recetas360/FirebaseServices.dart'; // Importar FirebaseService
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,82 +24,6 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-// Método para actualizar los nombres en los comentarios
-Future<void> actualizarNombresEnComentarios() async {
-  try {
-    QuerySnapshot recetasSnapshot =
-        await FirebaseFirestore.instance.collection('recetas').get();
-
-    WriteBatch batch = FirebaseFirestore.instance.batch();
-    int batchCounter = 0;
-
-    for (var recetaDoc in recetasSnapshot.docs) {
-      QuerySnapshot comentariosSnapshot = await recetaDoc.reference
-          .collection('comentarios')
-          .get();
-
-      for (var comentarioDoc in comentariosSnapshot.docs) {
-        final data = comentarioDoc.data() as Map<String, dynamic>?;
-
-        if (data != null &&
-            data.containsKey('usuarioId') &&
-            (!data.containsKey('usuarioNombre') ||
-                data['usuarioNombre'] == 'Usuario desconocido')) {
-          String usuarioId = data['usuarioId'];
-          DocumentSnapshot userDoc = await FirebaseFirestore.instance
-              .collection('usuarios')
-              .doc(usuarioId)
-              .get();
-
-          if (userDoc.exists) {
-            String nombreUsuario =
-                (userDoc.data() as Map<String, dynamic>?)?['nombre'] ??
-                    'Usuario desconocido';
-            batch.update(comentarioDoc.reference,
-                {'usuarioNombre': nombreUsuario});
-            batchCounter++;
-
-            if (batchCounter >= 400) {
-              await batch.commit();
-              batch = FirebaseFirestore.instance.batch();
-              batchCounter = 0;
-            }
-          } else {
-            batch.update(comentarioDoc.reference,
-                {'usuarioNombre': 'Usuario eliminado'});
-            batchCounter++;
-            if (batchCounter >= 400) {
-              await batch.commit();
-              batch = FirebaseFirestore.instance.batch();
-              batchCounter = 0;
-            }
-          }
-        } else if (data == null || !data.containsKey('usuarioId')) {
-          print(
-              'Comentario sin usuarioId o data null: ${comentarioDoc.id} en receta ${recetaDoc.id}');
-        }
-      }
-    }
-
-    if (batchCounter > 0) {
-      await batch.commit();
-    }
-
-    print('Actualización de nombres en comentarios completada.');
-    await FirebaseFirestore.instance
-        .collection('configuraciones')
-        .doc('actualizacion_nombres')
-        .set({'completada': true});
-    print('Marca de actualización de nombres en comentarios establecida.');
-  } catch (e) {
-    print('Error al actualizar nombres en comentarios: $e');
-    FirebaseAnalytics.instance.logEvent(
-      name: 'error_actualizar_comentarios',
-      parameters: {'error': e.toString()},
-    );
-  }
-}
-
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -110,6 +35,7 @@ class _MyAppState extends State<MyApp> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   FirebaseAnalytics analytics = FirebaseAnalytics.instance;
   bool _isInitialized = false;
+  final FirebaseService _firebaseService = FirebaseService(); // Instancia
 
   @override
   void initState() {
@@ -142,11 +68,11 @@ class _MyAppState extends State<MyApp> {
 
       if (!actualizacionCompletada) {
         print(
-            "Iniciando actualización de nombres en comentarios en segundo plano...");
-        actualizarNombresEnComentarios().catchError((error) {
-          print("Error en actualización de nombres en segundo plano: $error");
+            "Iniciando actualización de nombres en comentarios en segundo plano (llamando a FirebaseService)...");
+        _firebaseService.actualizarNombresEnComentariosGlobal().catchError((error) {
+          print("Error en actualización de nombres en segundo plano (desde main): $error");
           analytics.logEvent(
-            name: 'error_actualizar_comentarios_background',
+            name: 'error_actualizar_comentarios_background_main',
             parameters: {'error': error.toString()},
           );
         });
