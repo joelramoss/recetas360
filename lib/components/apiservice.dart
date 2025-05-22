@@ -28,7 +28,7 @@ class ApiService {
     // final String fieldsToFetch = "product_name,nutriments";
 
     final url = Uri.parse(
-      "$baseUrl?search_terms=$encodedConsulta&action=process&json=1&page_size=5&fields=$fieldsToFetch",
+      "$baseUrl?search_terms=$encodedConsulta&action=process&json=1&page_size=10&fields=$fieldsToFetch",
     );
     final response = await http.get(url);
 

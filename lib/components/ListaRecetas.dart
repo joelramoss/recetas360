@@ -125,8 +125,13 @@ class _ListaRecetasState extends State<ListaRecetas> {
                     curve: Curves.easeOut),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CrearRecetaScreen())),
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => CrearRecetaScreen(
+                            initialCategoria: widget.mainCategory,
+                            initialGastronomia: widget.subCategory,
+                          ))),
               icon: const Icon(Icons.add_circle_outline_rounded),
               label: const Text("Crear la Primera Receta"),
             )
@@ -564,12 +569,15 @@ class _ListaRecetasState extends State<ListaRecetas> {
             return Scaffold(
               appBar: _buildAppBar(context, textTheme),
               body: body,
-              floatingActionButton: recipesExist
+              floatingActionButton: recipesExist // O siempre visible si lo prefieres
                   ? FloatingActionButton.extended(
                       onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const CrearRecetaScreen())),
+                              builder: (_) => CrearRecetaScreen( // Pasar parámetros
+                                    initialCategoria: widget.mainCategory,
+                                    initialGastronomia: widget.subCategory,
+                                  ))),
                       icon: const Icon(Icons.add_rounded),
                       label: const Text("Crear Receta"),
                     ).animate().slideY(
@@ -577,7 +585,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                       delay: 500.ms,
                       duration: 500.ms,
                       curve: Curves.easeOut)
-                  : null,
+                  : null, // Si es null, el botón de _buildEmptyState se encargará si la lista está vacía
             );
           },
         );

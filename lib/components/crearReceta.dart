@@ -7,7 +7,7 @@ import 'nutritionalifno.dart'; // Donde tienes la clase NutritionalInfo y getRec
 Future<void> crearNuevaReceta() async {
   // Datos ingresados por el usuario:
   String nombre = "Ensalada Fresca";
-  String urlImagen = "https://via.placeholder.com/150";
+  String urlImagen = "";
   List<String> ingredientes = ["Lechuga", "Tomate", "Aceitunas", "Queso feta"];
   String descripcion = "Ensalada con ingredientes frescos tipicos del Mediterranea.";
   int tiempoMinutos = 15;

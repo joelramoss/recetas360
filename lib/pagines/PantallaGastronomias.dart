@@ -5,6 +5,7 @@ import 'package:recetas360/components/ListaRecetas.dart';
 import 'package:recetas360/pagines/InterfazAjustes.dart';
 import 'package:recetas360/pagines/HistorialRecetas.dart';
 import 'package:recetas360/pagines/RecetasFavoritas.dart';
+import 'package:recetas360/pagines/PantallacrearReceta.dart'; // Import CrearRecetaScreen
 import 'package:recetas360/widgetsutilizados/burbujaestilo.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -197,6 +198,21 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
           ),
         ],
       ),
+      // floatingActionButton: FloatingActionButton.extended( // ELIMINAR ESTE BLOQUE
+      //   onPressed: () {
+      //     Navigator.push(
+      //       context,
+      //       MaterialPageRoute(
+      //         builder: (_) => CrearRecetaScreen(
+      //           initialCategoria: widget.tipoAlimento,
+      //         ),
+      //       ),
+      //     ).then((_) => _restartAnimation());
+      //   },
+      //   icon: const Icon(Icons.add_rounded),
+      //   label: Text('Crear en ${widget.tipoAlimento}'),
+      //   tooltip: 'Crear nueva receta en ${widget.tipoAlimento}',
+      // ).animate().fadeIn(delay: 800.ms).scale(delay: 700.ms), // HASTA AQUÍ
     );
   }
 

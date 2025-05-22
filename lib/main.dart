@@ -4,10 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:provider/provider.dart'; // Import Provider
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';
+import 'package:recetas360/serveis/ThemeNotifier.dart'; // Importa tu ThemeNotifier
 import 'firebase_options.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,7 +25,13 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   GoogleFonts.config.allowRuntimeFetching = false;
-  runApp(const MyApp());
+  // Envuelve la aplicación con ChangeNotifierProvider
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeNotifier(ThemeMode.system), // Inicializa con el tema del sistema
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -130,7 +138,9 @@ class _MyAppState extends State<MyApp> {
 
   void _handleDeepLink(Uri deepLink) async {
     if (!_isInitialized) {
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Espera a que _isInitialized sea true o usa un Completer si es necesario
+      // para una sincronización más robusta.
+      await Future.doWhile(() => !_isInitialized);
     }
     analytics.logEvent(
       name: 'handle_deep_link',
@@ -174,6 +184,9 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Accede al ThemeNotifier
+    final themeNotifier = Provider.of<ThemeNotifier>(context);
+
     final poppins = GoogleFonts.poppinsTextTheme(
       Theme.of(context).textTheme,
     );
@@ -182,10 +195,10 @@ class _MyAppState extends State<MyApp> {
         navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         home: const Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: Colors.black, // O un color de tu tema oscuro base
           body: Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(Colors.white),
+              valueColor: AlwaysStoppedAnimation(Colors.white), // O un color de tu tema claro
             ),
           ),
         ),
@@ -232,7 +245,7 @@ class _MyAppState extends State<MyApp> {
         textTheme: poppins,
         primaryTextTheme: poppins,
       ),
-      themeMode: ThemeMode.system,
+      themeMode: themeNotifier.themeMode, // Usa el themeMode del notifier
       home: const Paginalogin(),
       navigatorObservers: [
         FirebaseAnalyticsObserver(analytics: analytics),

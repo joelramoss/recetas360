@@ -8,7 +8,7 @@ import 'package:recetas360/components/producto.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:recetas360/FirebaseServices.dart'; // Para StorageService
 import 'package:recetas360/serveis/ImagePickerService.dart'; // Importar el nuevo servicio
-import 'package:recetas360/serveis/kInputDecoration.dart'; // Importar el nuevo widget
+import 'package:recetas360/serveis/kInputDecoration.dart'; // Asegúrate que esta importación esté
 
 class IngredientSelection {
   String name;
@@ -20,7 +20,14 @@ class IngredientSelection {
 }
 
 class CrearRecetaScreen extends StatefulWidget {
-  const CrearRecetaScreen({super.key});
+  final String? initialCategoria;
+  final String? initialGastronomia;
+
+  const CrearRecetaScreen({
+    super.key,
+    this.initialCategoria,
+    this.initialGastronomia,
+  });
 
   @override
   _CrearRecetaScreenState createState() => _CrearRecetaScreenState();
@@ -60,9 +67,32 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
   String? _selectedGastronomia;
   List<String> _gastronomiasDisponibles = [];
 
+  bool _isCategoriaLocked = false;
+  bool _isGastronomiaLocked = false;
+
   @override
   void initState() {
     super.initState();
+
+    if (widget.initialCategoria != null) {
+      _selectedCategoria = widget.initialCategoria;
+      _isCategoriaLocked = true; // Lock the category
+      if (categoriasConGastronomias.containsKey(_selectedCategoria)) {
+        _gastronomiasDisponibles = categoriasConGastronomias[_selectedCategoria!]!;
+      } else {
+        _gastronomiasDisponibles = []; // Should not happen if data is consistent
+      }
+    }
+
+    if (widget.initialGastronomia != null) {
+      // Only set and lock gastronomy if its category is also set (either initially or by user)
+      // and the gastronomy is valid for that category.
+      if (_selectedCategoria != null && _gastronomiasDisponibles.contains(widget.initialGastronomia)) {
+        _selectedGastronomia = widget.initialGastronomia;
+        _isGastronomiaLocked = true; // Lock the gastronomy
+      }
+    }
+
     _addIngredient();
     _addStep();
   }
@@ -327,6 +357,40 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    // final bool isDark = Theme.of(context).brightness == Brightness.dark; // No es necesario para lockedFillColor si es un gris fijo
+
+    // Color para campos editables (Dropdowns desbloqueados)
+    const defaultFillColor = Colors.white; 
+    
+    // Color para campos bloqueados (Dropdowns bloqueados)
+    final lockedFillColor = Colors.grey.shade200; // Un gris claro para contraste con el blanco
+
+    // Borde consistente para Dropdowns (debe coincidir con kInputDecoration)
+    final consistentInputBorder = OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.outline,
+          width: 1.0,
+        ),
+      );
+    final focusedConsistentInputBorder = consistentInputBorder.copyWith(
+        borderSide: BorderSide(
+          color: colorScheme.primary,
+          width: 2.0,
+        ),
+      );
+    final errorConsistentInputBorder = consistentInputBorder.copyWith(
+        borderSide: BorderSide(
+          color: colorScheme.error,
+          width: 1.5,
+        ),
+      );
+    final focusedErrorConsistentInputBorder = consistentInputBorder.copyWith(
+        borderSide: BorderSide(
+          color: colorScheme.error,
+          width: 2.0,
+        ),
+      );
 
     return Scaffold(
       appBar: AppBar(
@@ -353,74 +417,34 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                           style: textTheme.titleLarge
                               ?.copyWith(color: colorScheme.primary)),
                       const SizedBox(height: 16),
+                      // Los TextFormField usarán kInputDecoration, que ahora tiene fondo blanco
                       TextFormField(
                         controller: _nombreController,
-                        decoration: kInputDecoration(context: context, labelText: "Nombre de la Receta"),
-                        validator: (value) => value == null || value.isEmpty
-                            ? "Ingresa el nombre"
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Text("Imagen de la Receta", style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: GestureDetector(
-                          onTap: _isSaving
-                              ? null
-                              : () => _imagePickerService.showImageSourceActionSheet(
-                                    context: context,
-                                    onImageSelected: (file) {
-                                      setState(() {
-                                        _selectedImageFile = file;
-                                      });
-                                    },
-                                  ),
-                          child: Container(
-                            height: 180,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: _selectedImageFile == null
-                                      ? colorScheme.outlineVariant
-                                      : Colors.transparent,
-                                  width: _selectedImageFile == null ? 1 : 0),
-                            ),
-                            child: _selectedImageFile != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(11),
-                                    child: Image.file(
-                                      _selectedImageFile!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.add_a_photo_outlined,
-                                          size: 48,
-                                          color: colorScheme.primary),
-                                      const SizedBox(height: 8),
-                                      Text("Toca para seleccionar imagen",
-                                          style: textTheme.bodyMedium?.copyWith(
-                                              color: colorScheme.onSurfaceVariant)),
-                                    ],
-                                  ),
-                          ),
+                        decoration: kInputDecoration( 
+                          context: context,
+                          labelText: "Nombre de la receta",
                         ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ingresa un nombre para la receta';
+                          }
+                          return null;
+                        },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _descripcionController,
-                        decoration: kInputDecoration(context: context, labelText: "Descripción"),
+                        decoration: kInputDecoration( 
+                          context: context,
+                          labelText: "Descripción",
+                        ),
                         maxLines: 3,
-                        keyboardType: TextInputType.multiline,
-                        validator: (value) => value == null || value.isEmpty
-                            ? "Ingresa la descripción"
-                            : null,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ingresa una descripción';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -446,8 +470,16 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                             child: DropdownButtonFormField<String>(
                               value: _selectedCategoria,
                               isExpanded: true,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: "Categoría",
+                                filled: true,
+                                fillColor: _isCategoriaLocked ? lockedFillColor : defaultFillColor, // Blanco o gris
+                                border: consistentInputBorder,
+                                enabledBorder: consistentInputBorder,
+                                focusedBorder: focusedConsistentInputBorder,
+                                errorBorder: errorConsistentInputBorder,
+                                focusedErrorBorder: focusedErrorConsistentInputBorder,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
                               ),
                               hint: const Text('Selecciona'),
                               items: categoriasConGastronomias.keys
@@ -457,14 +489,17 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                                   child: Text(categoria),
                                 );
                               }).toList(),
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _selectedCategoria = newValue;
-                                  _selectedGastronomia = null;
-                                  _gastronomiasDisponibles =
-                                      categoriasConGastronomias[newValue] ?? [];
-                                });
-                              },
+                              onChanged: _isCategoriaLocked
+                                  ? null 
+                                  : (String? newValue) {
+                                      setState(() {
+                                        _selectedCategoria = newValue;
+                                        _selectedGastronomia = null; 
+                                        _isGastronomiaLocked = false; 
+                                        _gastronomiasDisponibles =
+                                            categoriasConGastronomias[newValue] ?? [];
+                                      });
+                                    },
                               validator: (value) => value == null
                                   ? 'Selecciona categoría'
                                   : null,
@@ -475,11 +510,18 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                             child: DropdownButtonFormField<String>(
                               value: _selectedGastronomia,
                               isExpanded: true,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: "Gastronomía",
+                                filled: true,
+                                fillColor: _isGastronomiaLocked ? lockedFillColor : defaultFillColor, // Blanco o gris
+                                border: consistentInputBorder,
+                                enabledBorder: consistentInputBorder,
+                                focusedBorder: focusedConsistentInputBorder,
+                                errorBorder: errorConsistentInputBorder,
+                                focusedErrorBorder: focusedErrorConsistentInputBorder,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
                               ),
-                              hint: const Text('Selecciona'),
-                              disabledHint: const Text('Elige categoría primero'),
+                              hint: _selectedCategoria == null ? const Text('Elige categoría') : const Text('Selecciona'),
                               items: _gastronomiasDisponibles
                                   .map((String gastronomia) {
                                 return DropdownMenuItem<String>(
@@ -487,8 +529,8 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                                   child: Text(gastronomia),
                                 );
                               }).toList(),
-                              onChanged: _selectedCategoria == null
-                                  ? null
+                              onChanged: _isGastronomiaLocked || _selectedCategoria == null
+                                  ? null 
                                   : (String? newValue) {
                                       setState(() {
                                         _selectedGastronomia = newValue;

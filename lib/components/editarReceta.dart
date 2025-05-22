@@ -2,7 +2,7 @@ import 'dart:io'; // Necesario para File
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/FirebaseServices.dart';
-import 'package:recetas360/serveis/kInputDecoration.dart';
+import 'package:recetas360/serveis/kInputDecoration.dart'; // Asegúrate que esta importación esté
 import 'package:recetas360/serveis/ImagePickerService.dart'; // Importar
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/producto.dart';
@@ -308,6 +308,10 @@ class _EditarRecetaState extends State<EditarReceta> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    // final bool isDark = Theme.of(context).brightness == Brightness.dark; // No es necesario para lockedFillColor si es un gris fijo
+    
+    // Color para campos bloqueados (Categoría y Gastronomía en modo edición)
+    final lockedFillColor = Colors.grey.shade200; // Un gris claro para contraste con el blanco
 
     return Scaffold(
       appBar: AppBar(
@@ -321,7 +325,7 @@ class _EditarRecetaState extends State<EditarReceta> {
             _buildSectionHeader(context, "Información Básica"),
             TextFormField(
               controller: _nombreController,
-              decoration: kInputDecoration(context: context, labelText: "Nombre de la Receta", icon: Icons.restaurant_menu_rounded), // Usar kInputDecoration
+              decoration: kInputDecoration(context: context, labelText: "Nombre de la Receta", icon: Icons.restaurant_menu_rounded),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                enabled: !_isSaving, textCapitalization: TextCapitalization.sentences,
             ).animate().fadeIn(delay: 100.ms),
@@ -395,7 +399,7 @@ class _EditarRecetaState extends State<EditarReceta> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _descripcionController,
-              decoration: kInputDecoration(context: context, labelText: "Descripción", icon: Icons.description_outlined), // Usar kInputDecoration
+              decoration: kInputDecoration(context: context, labelText: "Descripción", icon: Icons.description_outlined),
               maxLines: 3, enabled: !_isSaving, textCapitalization: TextCapitalization.sentences,
             ).animate().fadeIn(delay: 200.ms),
              const SizedBox(height: 12),
@@ -405,7 +409,7 @@ class _EditarRecetaState extends State<EditarReceta> {
                   Expanded(
                      child: TextFormField(
                         controller: _tiempoController,
-                        decoration: kInputDecoration(context: context, labelText: "Tiempo (min)", icon: Icons.timer_outlined), // Usar kInputDecoration
+                        decoration: kInputDecoration(context: context, labelText: "Tiempo (min)", icon: Icons.timer_outlined),
                         keyboardType: const TextInputType.numberWithOptions(decimal: false),
                          enabled: !_isSaving,
                         validator: (v) {
@@ -438,8 +442,13 @@ class _EditarRecetaState extends State<EditarReceta> {
                  Expanded(
                     child: TextFormField(
                        controller: _categoriaController,
-                       decoration: kInputDecoration(context: context, labelText: "Categoría", icon: Icons.category_outlined), // Usar kInputDecoration
-                        enabled: !_isSaving, textCapitalization: TextCapitalization.words,
+                       decoration: kInputDecoration(
+                         context: context,
+                         labelText: "Categoría",
+                         icon: Icons.category_outlined
+                       ).copyWith(fillColor: lockedFillColor), // Fondo gris para campo bloqueado
+                       readOnly: true,
+                       textCapitalization: TextCapitalization.words,
                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ).animate().fadeIn(delay: 350.ms),
                  ),
@@ -447,8 +456,13 @@ class _EditarRecetaState extends State<EditarReceta> {
                   Expanded(
                     child: TextFormField(
                        controller: _gastronomiaController,
-                       decoration: kInputDecoration(context: context, labelText: "Gastronomía", icon: Icons.public_rounded), // Usar kInputDecoration
-                        enabled: !_isSaving, textCapitalization: TextCapitalization.words,
+                       decoration: kInputDecoration(
+                         context: context,
+                         labelText: "Gastronomía",
+                         icon: Icons.public_rounded
+                       ).copyWith(fillColor: lockedFillColor), // Fondo gris para campo bloqueado
+                       readOnly: true, 
+                       textCapitalization: TextCapitalization.words,
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ).animate().fadeIn(delay: 400.ms),
                  ),

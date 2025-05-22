@@ -36,19 +36,23 @@ dependencies:
   image_picker: ^1.1.1
   flutter_rating_bar: ^4.0.1
   share_plus: ^11.0.0
-  audioplayers: ^5.0.0
+  # Replace audioplayers with just_audio
+  just_audio: ^0.9.36
+  audio_session: ^0.1.18 # Add or ensure this line is present
 
 # Development dependencies
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1 # <--- AÑADIDO
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
     - assets/sounds/notification.mp3
+    - assets/icon/ # <--- ASEGÚRATE DE QUE ESTA CARPETA (O DONDE ESTÉ TU ICONO) ESTÉ LISTADA SI ES NECESARIO PARA OTROS PROPÓSITOS
   # --- SECCIÓN DE FUENTES AÑADIDA/MODIFICADA ---
   fonts:
     - family: Poppins
@@ -60,3 +64,12 @@ flutter:
           weight: 600
         - asset: assets/fonts/Poppins-Bold.ttf
           weight: 700
+
+# Configuración para flutter_launcher_icons
+flutter_launcher_icons:
+  android: "launcher_icon" # Nombre del icono para Android
+  ios: true
+  image_path: "assets/icon/logo.png" # Ruta a tu imagen de icono principal
+  min_sdk_android: 21 # Requerido para iconos adaptativos
+  adaptive_icon_foreground: "assets/icon/logo.png" # Si tu icono principal ya tiene el diseño final, puedes reusarlo.           
+  remove_alpha_ios: true

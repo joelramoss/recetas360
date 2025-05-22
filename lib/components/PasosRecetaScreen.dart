@@ -5,7 +5,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:recetas360/components/Receta.dart';
-import 'package:audioplayers/audioplayers.dart';
+// Change this import
+import 'package:just_audio/just_audio.dart';
+
 
 class PasosRecetaScreen extends StatefulWidget {
   final Receta receta;
@@ -20,12 +22,13 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
   late final PageController _pageController;
   late final Map<int, int> _stepDurationMap;
 
-  Timer? _timer;
+  Timer? _timer; // Timer para la cuenta regresiva del paso
   bool _timerRunning = false;
   int _secondsRemaining = 0;
   int _initialDurationSeconds = 0;
 
-  final AudioPlayer _audioPlayer = AudioPlayer(); // Reproductor de sonido
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  Timer? _notificationSoundTimer; // Timer para auto-detener el sonido de notificación
 
   @override
   void initState() {
@@ -39,12 +42,15 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _notificationSoundTimer?.cancel(); // Asegúrate de cancelar este timer también
     _pageController.removeListener(_onPageChanged);
     _pageController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
   void _onPageChanged() {
+    _stopNotificationSound(); // Detener sonido si cambia la página
     final page = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
     if (_timerRunning) _cancelTimer();
     final seconds = _stepDurationMap[page] ?? 0;
@@ -126,25 +132,26 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
     });
   }
 
-  /// Reproduce el sonido de notificación y lo detiene tras 5 segundos
+  /// Reproduce el sonido de notificación usando just_audio
   Future<void> _playNotificationSound() async {
     try {
-      // Crear un nuevo AudioPlayer local para esta reproducción
-      final player = AudioPlayer();
+      await _audioPlayer.setAsset('assets/sounds/notification.mp3');
+      await _audioPlayer.play();
       
-      // Reproducir el sonido de notificación
-      await player.play(AssetSource('sounds/notification.mp3'));
-      
-      // Programar la detención automática tras 5 segundos
-      Timer(const Duration(seconds: 5), () async {
-        await player.stop();
-        // Liberar recursos del reproductor
-        await player.dispose();
+      _notificationSoundTimer?.cancel(); // Cancela cualquier timer anterior
+      _notificationSoundTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted) { // Buena práctica verificar si el widget sigue montado
+          _audioPlayer.stop();
+        }
       });
     } catch (e) {
       debugPrint('Error al reproducir sonido de notificación: $e');
-      // No lanzamos la excepción para evitar interrumpir el flujo de la app
     }
+  }
+
+  void _stopNotificationSound() {
+    _audioPlayer.stop();
+    _notificationSoundTimer?.cancel();
   }
 
   void _cancelTimer() {
@@ -162,6 +169,7 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
   }
 
   void _goToPrevious() {
+    _stopNotificationSound(); // Detener sonido si va al paso anterior
     final prev = (_pageController.page?.round() ?? 0) - 1;
     if (prev >= 0) {
       _pageController.animateToPage(
@@ -173,6 +181,7 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
   }
 
   void _goToNext() {
+    _stopNotificationSound(); // Detener el sonido al ir al siguiente paso
     final next = (_pageController.page?.round() ?? 0) + 1;
     if (next < widget.receta.pasos.length) {
       _pageController.animateToPage(
@@ -181,11 +190,17 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      _guardarRecetaCompletada().then((_) => Navigator.pop(context));
+      // Si es el último paso, llama a guardar pero también detiene el sonido
+      _guardarRecetaCompletada().then((_) {
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      });
     }
   }
 
   Future<void> _guardarRecetaCompletada() async {
+    _stopNotificationSound(); // Detener el sonido al finalizar la receta
     final colorScheme = Theme.of(context).colorScheme;
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -300,19 +315,26 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
                             ),
                           if (_timerRunning && i == pageIndex)
                             SizedBox(
-                              height: 120,
+                              height: 180, // Aumentado de 150 a 180
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  CircularProgressIndicator(
-                                    value: _initialDurationSeconds > 0
-                                        ? _secondsRemaining / _initialDurationSeconds
-                                        : 0,
-                                    strokeWidth: 8,
+                                  SizedBox( // Envuelve el CircularProgressIndicator para controlar su tamaño
+                                    width: 120, // Define el ancho del indicador
+                                    height: 120, // Define el alto del indicador
+                                    child: CircularProgressIndicator(
+                                      value: _initialDurationSeconds > 0
+                                          ? _secondsRemaining / _initialDurationSeconds
+                                          : 0,
+                                      strokeWidth: 10, // Aumentado de 8 a 10 para mejor proporción
+                                      backgroundColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                                    ),
                                   ),
                                   Text(
                                     _formatTime(_secondsRemaining),
-                                    style: Theme.of(context).textTheme.headlineSmall,
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Cambiado a headlineMedium
+                                      fontWeight: FontWeight.bold, // Opcional: para hacerlo más prominente
+                                    ),
                                   ),
                                 ],
                               ),
@@ -337,7 +359,8 @@ class _PasosRecetaScreenState extends State<PasosRecetaScreen> {
                   ElevatedButton.icon(
                     icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios),
                     label: Text(isLast ? 'Finalizar' : 'Siguiente'),
-                    onPressed: isLast ? _guardarRecetaCompletada : _goToNext,
+                    onPressed: _goToNext, // Modificado para llamar siempre a _goToNext
+                                         // _goToNext manejará la lógica de si es el último paso o no.
                   ),
                 ],
               ).animate().fadeIn(),
