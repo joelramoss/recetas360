@@ -3,39 +3,40 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/pagines/PaginaLogin.dart';
 import 'firebase_options.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:recetas360/FirebaseServices.dart'; // Importar FirebaseService
+
+/// Constantes de colecciones y documentos
+class FirebaseConstants {
+  static const configCollection = 'configuraciones';
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Inicializa Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   GoogleFonts.config.allowRuntimeFetching = false;
-
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
+  const MyApp({Key? key}) : super(key: key);
   @override
   _MyAppState createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  final navigatorKey = GlobalKey<NavigatorState>();
+  final analytics = FirebaseAnalytics.instance;
+  final functions = FirebaseFunctions.instance;
   bool _isInitialized = false;
-  final FirebaseService _firebaseService = FirebaseService(); // Instancia
 
   @override
   void initState() {
@@ -47,43 +48,43 @@ class _MyAppState extends State<MyApp> {
     await _initDynamicLinks();
     analytics.logAppOpen();
 
-    _lanzarActualizacionComentariosEnSegundoPlano();
-
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+    final prefs = await SharedPreferences.getInstance();
+    final checked = prefs.getBool('checkedMigration') ?? false;
+    if (!checked) {
+      _launchBackgroundMigration();
+      await prefs.setBool('checkedMigration', true);
     }
+
+    if (mounted) setState(() => _isInitialized = true);
   }
 
-  Future<void> _lanzarActualizacionComentariosEnSegundoPlano() async {
+  Future<void> _launchBackgroundMigration() async {
     try {
-      DocumentSnapshot configDoc = await FirebaseFirestore.instance
-          .collection('configuraciones')
+      final configDoc = await FirebaseFirestore.instance
+          .collection(FirebaseConstants.configCollection)
           .doc('actualizacion_nombres')
           .get();
-
-      bool actualizacionCompletada =
-          configDoc.exists && configDoc.get('completada') == true;
-
-      if (!actualizacionCompletada) {
-        print(
-            "Iniciando actualización de nombres en comentarios en segundo plano (llamando a FirebaseService)...");
-        _firebaseService.actualizarNombresEnComentariosGlobal().catchError((error) {
-          print("Error en actualización de nombres en segundo plano (desde main): $error");
-          analytics.logEvent(
-            name: 'error_actualizar_comentarios_background_main',
-            parameters: {'error': error.toString()},
+      final done = configDoc.data()?['completada'] == true;
+      if (!done) {
+        final ctx = navigatorKey.currentContext;
+        if (ctx != null) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Actualizando comentarios en segundo plano...'),
+            ),
           );
-        });
-      } else {
-        print(
-            "La actualización de nombres en comentarios ya fue completada previamente.");
+        }
+        final callable = functions.httpsCallable('migrateAllCommentUserNames');
+        final result = await callable();
+        analytics.logEvent(
+          name: 'migration_complete',
+          parameters:
+              Map<String, Object>.from(result.data as Map<String, dynamic>),
+        );
       }
     } catch (e) {
-      print("Error al verificar estado de actualización de comentarios: $e");
       analytics.logEvent(
-        name: 'error_verificar_actualizacion_comentarios',
+        name: 'error_migration_main',
         parameters: {'error': e.toString()},
       );
     }
@@ -91,7 +92,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initDynamicLinks() async {
     FirebaseDynamicLinks.instance.onLink.listen(
-      (PendingDynamicLinkData? dynamicLinkData) {
+      (dynamicLinkData) {
         if (dynamicLinkData != null) {
           analytics.logEvent(
             name: 'dynamic_link_received',
@@ -100,18 +101,16 @@ class _MyAppState extends State<MyApp> {
           _handleDeepLink(dynamicLinkData.link);
         }
       },
-      onError: (error) {
-        print('Error en onLink de Dynamic Links: $error');
+      onError: (e) {
         analytics.logEvent(
           name: 'dynamic_link_onlink_error',
-          parameters: {'error': error.toString()},
+          parameters: {'error': e.toString()},
         );
       },
     );
 
     try {
-      final PendingDynamicLinkData? initialLink =
-          await FirebaseDynamicLinks.instance.getInitialLink();
+      final initialLink = await FirebaseDynamicLinks.instance.getInitialLink();
       if (initialLink != null) {
         analytics.logEvent(
           name: 'dynamic_link_initial_received',
@@ -122,7 +121,6 @@ class _MyAppState extends State<MyApp> {
         analytics.logEvent(name: 'dynamic_link_initial_null');
       }
     } catch (e) {
-      print('Error al obtener initialLink de Dynamic Links: $e');
       analytics.logEvent(
         name: 'dynamic_link_initial_error',
         parameters: {'error': e.toString()},
@@ -134,91 +132,65 @@ class _MyAppState extends State<MyApp> {
     if (!_isInitialized) {
       await Future.delayed(const Duration(milliseconds: 500));
     }
-
-    print("Deep Link recibido: $deepLink");
     analytics.logEvent(
       name: 'handle_deep_link',
       parameters: {'link': deepLink.toString()},
     );
     if (deepLink.pathSegments.contains('receta')) {
-      final String? recipeId = deepLink.queryParameters['id'];
-      if (recipeId != null && recipeId.isNotEmpty) {
-        print("Navegando a la receta con ID: $recipeId");
-        analytics.logEvent(
-          name: 'deep_link_navigate_recipe',
-          parameters: {'recipe_id': recipeId},
-        );
+      final id = deepLink.queryParameters['id'];
+      if (id != null && id.isNotEmpty) {
         try {
-          DocumentSnapshot recipeDoc = await FirebaseFirestore.instance
+          final doc = await FirebaseFirestore.instance
               .collection('recetas')
-              .doc(recipeId)
+              .doc(id)
               .get();
-          if (recipeDoc.exists && recipeDoc.data() != null) {
+          if (doc.exists) {
             final receta = Receta.fromFirestore(
-                recipeDoc.data() as Map<String, dynamic>, recipeDoc.id);
-            if (navigatorKey.currentState != null) {
-              navigatorKey.currentState?.push(MaterialPageRoute(
-                builder: (_) => DetalleReceta(receta: receta),
-              ));
+                doc.data()! as Map<String, dynamic>, doc.id);
+            final state = navigatorKey.currentState;
+            if (state != null) {
+              state.push(MaterialPageRoute(
+                  builder: (_) => DetalleReceta(receta: receta)));
               analytics.logEvent(
                 name: 'deep_link_recipe_found',
-                parameters: {'recipe_id': recipeId},
-              );
-            } else {
-              print(
-                  "Error: navigatorKey.currentState es null al intentar navegar por deep link.");
-              analytics.logEvent(
-                name: 'deep_link_navigator_null',
-                parameters: {'recipe_id': recipeId},
+                parameters: {'recipe_id': id},
               );
             }
           } else {
-            print("Receta con ID $recipeId no encontrada.");
             analytics.logEvent(
               name: 'deep_link_recipe_not_found',
-              parameters: {'recipe_id': recipeId},
+              parameters: {'recipe_id': id},
             );
           }
         } catch (e) {
-          print("Error al cargar la receta desde el deep link: $e");
           analytics.logEvent(
             name: 'deep_link_recipe_load_error',
-            parameters: {'recipe_id': recipeId, 'error': e.toString()},
+            parameters: {'error': e.toString()},
           );
         }
-      } else {
-        analytics.logEvent(
-          name: 'deep_link_recipe_id_missing',
-          parameters: {'link': deepLink.toString()},
-        );
       }
-    } else {
-      analytics.logEvent(
-        name: 'deep_link_path_not_receta',
-        parameters: {'link': deepLink.toString()},
-      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final poppinsTextTheme = GoogleFonts.poppinsTextTheme(textTheme);
-
+    final poppins = GoogleFonts.poppinsTextTheme(
+      Theme.of(context).textTheme,
+    );
     if (!_isInitialized) {
       return MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
-        home: Scaffold(
+        home: const Scaffold(
           backgroundColor: Colors.black,
           body: Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation(Colors.white),
             ),
           ),
         ),
       );
     }
-
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
@@ -239,8 +211,8 @@ class _MyAppState extends State<MyApp> {
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         useMaterial3: true,
         swapLegacyOnMaterial3: true,
-        textTheme: poppinsTextTheme,
-        primaryTextTheme: poppinsTextTheme,
+        textTheme: poppins,
+        primaryTextTheme: poppins,
       ),
       darkTheme: FlexThemeData.dark(
         scheme: FlexScheme.mango,
@@ -257,8 +229,8 @@ class _MyAppState extends State<MyApp> {
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         useMaterial3: true,
         swapLegacyOnMaterial3: true,
-        textTheme: poppinsTextTheme,
-        primaryTextTheme: poppinsTextTheme,
+        textTheme: poppins,
+        primaryTextTheme: poppins,
       ),
       themeMode: ThemeMode.system,
       home: const Paginalogin(),
