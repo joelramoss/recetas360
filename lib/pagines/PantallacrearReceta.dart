@@ -360,8 +360,8 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
     // final bool isDark = Theme.of(context).brightness == Brightness.dark; // No es necesario para lockedFillColor si es un gris fijo
 
     // Color para campos editables (Dropdowns desbloqueados)
-    const defaultFillColor = Colors.white; 
-    
+    const defaultFillColor = Colors.white;
+
     // Color para campos bloqueados (Dropdowns bloqueados)
     final lockedFillColor = Colors.grey.shade200; // Un gris claro para contraste con el blanco
 
@@ -417,10 +417,63 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                           style: textTheme.titleLarge
                               ?.copyWith(color: colorScheme.primary)),
                       const SizedBox(height: 16),
-                      // Los TextFormField usarán kInputDecoration, que ahora tiene fondo blanco
+                      // --- INICIO: Widget de selección de imagen ---
+                      Text("Imagen de la Receta", style: textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: GestureDetector(
+                          onTap: _isSaving ? null : () => _imagePickerService.showImageSourceActionSheet(
+                              context: context,
+                              onImageSelected: (file) {
+                                if (file != null) {
+                                  setState(() {
+                                    _selectedImageFile = file;
+                                  });
+                                }
+                              },
+                            ),
+                          child: Container(
+                            height: 180,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: _selectedImageFile == null
+                                      ? colorScheme.outlineVariant
+                                      : Colors.transparent,
+                                  width: 1),
+                            ),
+                            child: _selectedImageFile != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: Image.file(
+                                      _selectedImageFile!,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_a_photo_outlined,
+                                          size: 48,
+                                          color: colorScheme.primary),
+                                      const SizedBox(height: 8),
+                                      Text("Toca para seleccionar imagen",
+                                          style: textTheme.bodyMedium?.copyWith(
+                                              color: colorScheme.onSurfaceVariant)),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // --- FIN: Widget de selección de imagen ---
                       TextFormField(
                         controller: _nombreController,
-                        decoration: kInputDecoration( 
+                        decoration: kInputDecoration(
                           context: context,
                           labelText: "Nombre de la receta",
                         ),
@@ -434,7 +487,7 @@ class _CrearRecetaScreenState extends State<CrearRecetaScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _descripcionController,
-                        decoration: kInputDecoration( 
+                        decoration: kInputDecoration(
                           context: context,
                           labelText: "Descripción",
                         ),

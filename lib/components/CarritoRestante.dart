@@ -254,37 +254,6 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.send_rounded),
-                  label: const Text('Enviar Información'),
-                  onPressed: () {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Información enviada (funcionalidad placeholder)'),
-                          backgroundColor: colorScheme.secondaryContainer,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.secondary,
-                    foregroundColor: colorScheme.onSecondary,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.2),
-              ],
-            ),
-          ),
         ],
       ),
     );

@@ -158,8 +158,9 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                         text: "Todo",
                         size: centerBubbleSize,
                         imageUrl: imagenTodo,
-                        onTap: () => _navigateTo(const PantallaGastronomias(
-                            tipoAlimento: "Todo")),
+                        // Modifica el onTap aquí:
+                        onTap: () {
+                        },
                       ).animate().scale(
                           delay: 500.ms,
                           duration: 800.ms,

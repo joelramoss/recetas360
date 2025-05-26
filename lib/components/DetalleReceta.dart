@@ -192,10 +192,14 @@ class _DetalleRecetaState extends State<DetalleReceta> {
 
   String _formatearFecha(DateTime fecha) {
     try {
-      return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(fecha);
+      // Asegúrate de que el DateTime esté en la zona horaria local antes de formatear
+      final localDate = fecha.toLocal();
+      return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(localDate);
     } catch (e) {
        print("Error formateando fecha con intl locale 'es_ES': $e. Usando formato simple.");
-       return DateFormat('dd/MM/yyyy HH:mm').format(fecha);
+       // Fallback con conversión a local también
+       final localDate = fecha.toLocal();
+       return DateFormat('dd/MM/yyyy HH:mm').format(localDate);
     }
   }
 
@@ -553,11 +557,11 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                  stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
               ),
                actions: [ // Actions for SliverAppBar
-                IconButton(
-                  icon: const Icon(Icons.shopping_cart_outlined), // Use outlined for consistency
-                  tooltip: "Ver faltantes",
-                  onPressed: () => _mostrarIngredientesFaltantes(context),
-                ),
+                // IconButton(
+                //   icon: const Icon(Icons.shopping_cart_outlined), // Use outlined for consistency
+                //   tooltip: "Ver faltantes",
+                //   onPressed: () => _mostrarIngredientesFaltantes(context),
+                // ),
               ],
             ),
 
@@ -686,25 +690,38 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                   ).animate().fadeIn(delay: 700.ms),
                   const SizedBox(height: 25),
 
-                  _cargaInicial
-                      ? _buildShimmerCommentList(context)
-                      : _comentarios.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 40.0),
-                              child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Icon(Icons.chat_bubble_outline_rounded, size: 50, color: colorScheme.secondary),
-                                const SizedBox(height: 16),
-                                Text('No hay comentarios aún.\n¡Sé el primero!', style: textTheme.titleMedium?.copyWith(color: colorScheme.secondary), textAlign: TextAlign.center),
-                              ])),
-                            ).animate().fadeIn(delay: 200.ms)
-                          : Column(
-                              children: [
-                                ..._buildComentariosAgrupados(context),
-                                if (_cargandoMas) const Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: Center(child: CircularProgressIndicator(strokeWidth: 2.0))),
-                                if (_todosCargados && _comentarios.isNotEmpty && !_cargandoMas)
-                                   Padding(padding: const EdgeInsets.symmetric(vertical: 30.0), child: Center(child: Text("—— Fin ——", style: textTheme.labelMedium?.copyWith(color: colorScheme.outline)))).animate().fadeIn(),
-                              ],
-                            ),
+                  // --- INICIO: RefreshIndicator para comentarios ---
+                  RefreshIndicator(
+                    onRefresh: _cargarComentariosIniciales, // Llama a tu función de carga inicial
+                    color: colorScheme.primary,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    child: _cargaInicial
+                        ? _buildShimmerCommentList(context)
+                        : _comentarios.isEmpty
+                            ? Padding( // Envuelve el mensaje de "no hay comentarios" en un ListView para que RefreshIndicator funcione
+                                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                                child: ListView( // Necesario para que RefreshIndicator tenga un scrollable child
+                                  shrinkWrap: true, // Para que no ocupe toda la altura si no hay contenido
+                                  physics: const AlwaysScrollableScrollPhysics(), // Para permitir el pull-to-refresh incluso si no hay scroll
+                                  children: [
+                                    Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                      Icon(Icons.chat_bubble_outline_rounded, size: 50, color: colorScheme.secondary),
+                                      const SizedBox(height: 16),
+                                      Text('No hay comentarios aún.\n¡Sé el primero!', style: textTheme.titleMedium?.copyWith(color: colorScheme.secondary), textAlign: TextAlign.center),
+                                    ])),
+                                  ]
+                                ),
+                              ).animate().fadeIn(delay: 200.ms)
+                            : Column( // La lista de comentarios ya es un Column, que está bien dentro de RefreshIndicator si el CustomScrollView permite el scroll
+                                children: [
+                                  ..._buildComentariosAgrupados(context),
+                                  if (_cargandoMas) const Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: Center(child: CircularProgressIndicator(strokeWidth: 2.0))),
+                                  if (_todosCargados && _comentarios.isNotEmpty && !_cargandoMas)
+                                     Padding(padding: const EdgeInsets.symmetric(vertical: 30.0), child: Center(child: Text("—— Fin ——", style: textTheme.labelMedium?.copyWith(color: colorScheme.outline)))).animate().fadeIn(),
+                                ],
+                              ),
+                  ),
+                  // --- FIN: RefreshIndicator para comentarios ---
                 ]),
               ),
             ),
@@ -714,33 +731,6 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     );
   }
 
-  void _mostrarIngredientesFaltantes(BuildContext context) {
-    // This list should show ingredients where _ingredientesFaltantes[ing] is true
-    List<String> faltantes = _ingredientesFaltantes.entries
-        .where((entry) => entry.value == true) // entry.value is true if FALTANTE
-        .map((entry) => entry.key)
-        .toList();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Ingredientes faltantes para: ${widget.receta.nombre}'),
-        content: faltantes.isEmpty
-            ? const Text('¡Tienes todo lo necesario para esta receta!')
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: faltantes.map((ing) => Text('- $ing')).toList(),
-              ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _DialogoRespuestaWidget extends StatefulWidget {

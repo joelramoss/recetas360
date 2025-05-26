@@ -4,6 +4,7 @@ import 'package:recetas360/components/DetalleReceta.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:intl/date_symbol_data_local.dart'; // Import for initializeDateFormatting
 import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 
 // Current User's Login: joelramoss
@@ -16,16 +17,98 @@ class HistorialRecetas extends StatefulWidget {
   _HistorialRecetasState createState() => _HistorialRecetasState();
 }
 
+// Helper class for aggregated recipe data
+class AggregatedCompletedRecipe {
+  final String recetaId;
+  final String nombreReceta;
+  final String categoria;
+  final String gastronomia;
+  Timestamp latestTimestamp; // Puede cambiar si se encuentra una más reciente
+  int completionCount;
+  List<Timestamp> allCompletionTimestamps; // Nueva lista para todas las fechas
+
+  AggregatedCompletedRecipe({
+    required this.recetaId,
+    required this.nombreReceta,
+    required this.categoria,
+    required this.gastronomia,
+    required this.latestTimestamp,
+    this.completionCount = 0,
+    List<Timestamp>? allTimestamps, // Parámetro opcional para el constructor
+  }) : allCompletionTimestamps = allTimestamps ?? []; // Inicializar la lista
+}
+
 class _HistorialRecetasState extends State<HistorialRecetas> {
   // Date formatter
-  final DateFormat _dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
+  DateFormat? _dateFormatter;
+  bool _isDateFormatterInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDateFormatter();
+  }
+
+  Future<void> _initializeDateFormatter() async {
+    try {
+      await initializeDateFormatting('es_ES', null);
+      if (mounted) {
+        setState(() {
+          _dateFormatter = DateFormat('dd/MM/yyyy HH:mm', 'es_ES');
+          _isDateFormatterInitialized = true;
+        });
+      }
+    } catch (e) {
+      print("Error initializing date formatter: $e");
+      if (mounted) {
+        setState(() {
+          _dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
+          _isDateFormatterInitialized = true;
+        });
+      }
+    }
+  }
+
+  // Nueva función para filtrar recetas y verificar su existencia
+  Future<Map<String, AggregatedCompletedRecipe>> _filterAndVerifyRecipes(
+      Map<String, AggregatedCompletedRecipe> initialAggregatedRecipes) async {
+    final Map<String, AggregatedCompletedRecipe> filteredMap = {};
+    final List<Future<void>> verificationFutures = [];
+
+    initialAggregatedRecipes.forEach((recetaId, aggRecipe) {
+      verificationFutures.add(
+        FirebaseFirestore.instance
+            .collection('recetas')
+            .doc(recetaId)
+            .get()
+            .then((recetaDoc) {
+          if (recetaDoc.exists) {
+            filteredMap[recetaId] = aggRecipe;
+          } else {
+            print("Historial: Receta con ID $recetaId no encontrada. No se mostrará.");
+          }
+        }).catchError((error) {
+          print("Historial: Error al verificar receta $recetaId: $error. No se mostrará.");
+          // Decide si quieres manejar el error de otra forma, por ahora se excluye.
+        }),
+      );
+    });
+
+    await Future.wait(verificationFutures); // Esperar a que todas las verificaciones terminen
+    return filteredMap;
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (!_isDateFormatterInitialized || _dateFormatter == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Historial de Recetas')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final User? currentUser = FirebaseAuth.instance.currentUser;
-    // Handle case where user might not be logged in
     if (currentUser == null) {
-      // Optionally navigate to login or show a specific message
       return Scaffold(
         appBar: AppBar(title: const Text('Historial')),
         body: const Center(child: Text("Inicia sesión para ver tu historial.")),
@@ -37,43 +120,36 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
 
     return Scaffold(
       appBar: AppBar(
-        // backgroundColor: colorScheme.surface, // Uses theme default
         title: const Text('Historial de Recetas'),
       ),
-      // Removed Container with gradient
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('recetas_completadas')
             .where('usuario_id', isEqualTo: userId)
             .snapshots(),
-        builder: (context, snapshot) {
-          // --- Loading State ---
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator()); // Themed indicator
+        builder: (context, snapshotCompletadas) {
+          if (snapshotCompletadas.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
           }
-
-          // --- Error State ---
-          if (snapshot.hasError) {
-             print("Error loading history: ${snapshot.error}");
-             return Center(
-               child: Text(
-                 "Error al cargar el historial.",
-                 style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
-               ),
-             );
+          if (snapshotCompletadas.hasError) {
+            print("Error loading history: ${snapshotCompletadas.error}");
+            return Center(
+              child: Text(
+                "Error al cargar el historial.",
+                style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
+              ),
+            );
           }
-
-          // --- Empty State ---
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          if (!snapshotCompletadas.hasData || snapshotCompletadas.data!.docs.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                     Icon(Icons.history_toggle_off_rounded, size: 60, color: colorScheme.secondary),
-                     const SizedBox(height: 16),
-                     Text(
+                    Icon(Icons.history_toggle_off_rounded, size: 60, color: colorScheme.secondary),
+                    const SizedBox(height: 16),
+                    Text(
                       "Aún no has completado ninguna receta",
                       textAlign: TextAlign.center,
                       style: textTheme.titleMedium?.copyWith(color: colorScheme.secondary),
@@ -84,123 +160,247 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
             );
           }
 
-          // --- Data State ---
-          // Sort locally by timestamp (descending)
-          final docs = snapshot.data!.docs.toList()
-            ..sort((a, b) {
-              final aData = a.data() as Map<String, dynamic>?;
-              final bData = b.data() as Map<String, dynamic>?;
-              // Handle potential null data or timestamp
-              final Timestamp? aTime = aData?['timestamp'] as Timestamp?;
-              final Timestamp? bTime = bData?['timestamp'] as Timestamp?;
-              if (aTime == null && bTime == null) return 0;
-              if (aTime == null) return 1; // Nulls last
-              if (bTime == null) return -1; // Nulls last
-              return bTime.compareTo(aTime); // Most recent first
-            });
-
-          // Group documents by gastronomy
-          final Map<String, List<DocumentSnapshot>> recetasPorGastronomia = {};
-          for (final doc in docs) {
+          final Map<String, AggregatedCompletedRecipe> initialAggregatedRecipesMap = {};
+          for (final doc in snapshotCompletadas.data!.docs) {
             final data = doc.data() as Map<String, dynamic>?;
-            if (data == null) continue; // Skip if data is null
-            final gastronomia = data['gastronomia'] as String? ?? 'Otra'; // Default group
+            if (data == null) continue;
 
-            recetasPorGastronomia.putIfAbsent(gastronomia, () => []).add(doc);
+            final recetaId = data['receta_id'] as String?;
+            if (recetaId == null) continue;
+
+            final timestamp = (data['timestamp'] as Timestamp?) ?? (data['fecha_completado'] as Timestamp?);
+            if (timestamp == null) continue;
+
+            if (initialAggregatedRecipesMap.containsKey(recetaId)) {
+              final existingEntry = initialAggregatedRecipesMap[recetaId]!;
+              existingEntry.completionCount++;
+              existingEntry.allCompletionTimestamps.add(timestamp); 
+              if (timestamp.compareTo(existingEntry.latestTimestamp) > 0) {
+                existingEntry.latestTimestamp = timestamp; 
+              }
+            } else {
+              initialAggregatedRecipesMap[recetaId] = AggregatedCompletedRecipe(
+                recetaId: recetaId,
+                nombreReceta: data['nombre'] as String? ?? 'Receta sin nombre',
+                categoria: data['categoria'] as String? ?? 'Sin categoría',
+                gastronomia: data['gastronomia'] as String? ?? 'Otra',
+                latestTimestamp: timestamp,
+                completionCount: 1,
+                allTimestamps: [timestamp], 
+              );
+            }
           }
+          
+          initialAggregatedRecipesMap.values.forEach((recipe) {
+            recipe.allCompletionTimestamps.sort((a, b) => b.compareTo(a));
+          });
 
-          // Build list grouped by gastronomy
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: recetasPorGastronomia.length,
-            itemBuilder: (context, index) {
-              final gastronomia = recetasPorGastronomia.keys.toList()[index];
-              final recetas = recetasPorGastronomia[gastronomia]!;
-
-              // Use Card for each gastronomy group
-              return Card(
-                elevation: 1, // Subtle elevation
-                margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                clipBehavior: Clip.antiAlias, // Clip content to shape
-                child: ExpansionTile(
-                  // Themed ExpansionTile
-                  shape: const Border(), // Remove default border when expanded
-                  collapsedShape: const Border(), // Remove default border when collapsed
-                  backgroundColor: colorScheme.surfaceContainerLowest, // Background when expanded
-                  title: Text(
-                    gastronomia,
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          // Usar FutureBuilder para el proceso de filtrado
+          return FutureBuilder<Map<String, AggregatedCompletedRecipe>>(
+            future: _filterAndVerifyRecipes(initialAggregatedRecipesMap),
+            builder: (context, snapshotFiltradas) {
+              if (snapshotFiltradas.connectionState == ConnectionState.waiting) {
+                return const Center(child: Text("Verificando recetas del historial..."));
+              }
+              if (snapshotFiltradas.hasError) {
+                print("Error filtering/verifying recipes: ${snapshotFiltradas.error}");
+                return Center(
+                  child: Text(
+                    "Error al verificar las recetas del historial.",
+                    style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
                   ),
-                  // childrenPadding: const EdgeInsets.only(bottom: 8), // Add padding below children
-                  children: recetas.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>?;
-                    if (data == null) return const SizedBox.shrink(); // Skip rendering if data is null
+                );
+              }
+              if (!snapshotFiltradas.hasData || snapshotFiltradas.data!.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_toggle_off_rounded, size: 60, color: colorScheme.secondary),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No hay recetas completadas válidas en tu historial.",
+                          textAlign: TextAlign.center,
+                          style: textTheme.titleMedium?.copyWith(color: colorScheme.secondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
-                    // Use 'timestamp' field if 'fecha_completado' is not reliable
-                    final fecha = (data['timestamp'] as Timestamp?)?.toDate() ??
-                                  (data['fecha_completado'] as Timestamp?)?.toDate();
-                    final fechaFormateada = fecha != null ? _dateFormatter.format(fecha) : "Fecha desconocida";
-                    final categoria = data['categoria'] as String? ?? 'Sin categoría';
-                    final nombreReceta = data['nombre'] as String? ?? 'Receta sin nombre';
-                    final recetaId = data['receta_id'] as String?;
+              final Map<String, AggregatedCompletedRecipe> filteredAggregatedRecipesMap = snapshotFiltradas.data!;
+              
+              // Nueva estructura de agrupación:
+              // 1. Por Categoría
+              // 2. Dentro de cada Categoría, por Gastronomía
+              final Map<String, Map<String, List<AggregatedCompletedRecipe>>> recetasPorCategoriaLuegoGastronomia = {};
+              for (final aggRecipe in filteredAggregatedRecipesMap.values) {
+                recetasPorCategoriaLuegoGastronomia
+                    .putIfAbsent(aggRecipe.categoria, () => {})
+                    .putIfAbsent(aggRecipe.gastronomia, () => [])
+                    .add(aggRecipe);
+              }
 
-                    // Themed ListTile
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: colorScheme.primaryContainer,
-                        foregroundColor: colorScheme.onPrimaryContainer,
-                        child: Icon(_getCategoryIcon(categoria), size: 20),
+              // Ordenación:
+              // 1. Categorías alfabéticamente
+              final sortedCategoriaKeys = recetasPorCategoriaLuegoGastronomia.keys.toList()..sort();
+
+              // 2. Para cada categoría, Gastronomías alfabéticamente
+              // 3. Para cada lista de recetas (dentro de categoría/gastronomía), por latestTimestamp (más reciente primero)
+              for (final categoriaKey in sortedCategoriaKeys) {
+                final gastronomiasMap = recetasPorCategoriaLuegoGastronomia[categoriaKey]!;
+                final sortedGastronomiaKeysInternas = gastronomiasMap.keys.toList()..sort();
+                
+                Map<String, List<AggregatedCompletedRecipe>> sortedGastronomiasMapParaCategoria = {};
+                for(var gKey in sortedGastronomiaKeysInternas) {
+                    final recetas = gastronomiasMap[gKey]!;
+                    recetas.sort((a, b) => b.latestTimestamp.compareTo(a.latestTimestamp)); // Ordenar recetas por fecha
+                    sortedGastronomiasMapParaCategoria[gKey] = recetas;
+                }
+                recetasPorCategoriaLuegoGastronomia[categoriaKey] = sortedGastronomiasMapParaCategoria;
+              }
+              
+              if (sortedCategoriaKeys.isEmpty) {
+                 return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_toggle_off_rounded, size: 60, color: colorScheme.secondary),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No hay recetas completadas válidas en tu historial.",
+                          textAlign: TextAlign.center,
+                          style: textTheme.titleMedium?.copyWith(color: colorScheme.secondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: sortedCategoriaKeys.length,
+                itemBuilder: (context, categoriaIndex) {
+                  final categoria = sortedCategoriaKeys[categoriaIndex];
+                  final gastronomiasMap = recetasPorCategoriaLuegoGastronomia[categoria]!;
+                  final sortedGastronomiaKeysInternas = gastronomiasMap.keys.toList(); // Ya están ordenadas
+
+                  return Card(
+                    elevation: 1,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    clipBehavior: Clip.antiAlias,
+                    child: ExpansionTile( // ExpansionTile para la Categoría
+                      backgroundColor: colorScheme.surfaceContainerLowest,
+                      shape: const Border(), 
+                      collapsedShape: const Border(),
+                      title: Text(
+                        categoria,
+                        style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                      title: Text(nombreReceta, style: textTheme.bodyLarge),
-                      subtitle: Text(
-                        '$categoria • $fechaFormateada',
-                        style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                      ),
-                      onTap: recetaId == null ? null : () { // Disable onTap if recetaId is missing
-                        FirebaseFirestore.instance
-                            .collection('recetas')
-                            .doc(recetaId)
-                            .get()
-                            .then((recetaDoc) {
-                          if (!mounted) return; // Check if widget is still mounted
+                      children: sortedGastronomiaKeysInternas.map((gastronomiaKey) {
+                        final recetasAgregadas = gastronomiasMap[gastronomiaKey]!;
+                        
+                        return ExpansionTile( // ExpansionTile para la Gastronomía
+                          tilePadding: const EdgeInsets.only(left: 24, right: 16.0), // Indentación para subnivel
+                          title: Text(
+                            gastronomiaKey,
+                            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+                          ),
+                          children: recetasAgregadas.map((aggRecipe) {
+                            final fechaOriginalUltima = aggRecipe.latestTimestamp.toDate();
+                            final fechaAjustadaUltima = fechaOriginalUltima.add(const Duration(hours: 2));
+                            final ultimaFechaFormateada = _dateFormatter!.format(fechaAjustadaUltima);
+                            final countText = aggRecipe.completionCount > 1 ? " (x${aggRecipe.completionCount})" : "";
 
-                          if (recetaDoc.exists) {
-                            final recetaData = recetaDoc.data()!;
-                            recetaData['id'] = recetaDoc.id; // Ensure ID is added
+                            Widget tileContent = ListTile(
+                              contentPadding: const EdgeInsets.only(left: 32, right: 8, top: 4, bottom: 4), // Mayor indentación
+                              leading: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: colorScheme.primaryContainer,
+                                foregroundColor: colorScheme.onPrimaryContainer,
+                                child: Icon(_getCategoryIcon(aggRecipe.categoria), size: 18),
+                              ),
+                              title: Text("${aggRecipe.nombreReceta}$countText", style: textTheme.bodyLarge),
+                              subtitle: Text(
+                                'Última vez: $ultimaFechaFormateada', 
+                                style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                              ),
+                              onTap: () async {
+                                try {
+                                   final recetaDoc = await FirebaseFirestore.instance
+                                    .collection('recetas')
+                                    .doc(aggRecipe.recetaId)
+                                    .get();
 
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => DetalleReceta(
-                                  receta: Receta.fromFirestore(recetaData, recetaDoc.id),
-                                ),
-                              ),
+                                  if (!mounted) return;
+
+                                  if (recetaDoc.exists) {
+                                    final recetaData = recetaDoc.data()!;
+                                    recetaData['id'] = recetaDoc.id; 
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => DetalleReceta(
+                                          receta: Receta.fromFirestore(recetaData, recetaDoc.id),
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Esta receta ya no está disponible.', style: TextStyle(color: colorScheme.onError)),
+                                        backgroundColor: colorScheme.error,
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                } catch (error) {
+                                  if (!mounted) return;
+                                  print("Error fetching recipe details on tap: $error");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error al cargar detalles de la receta.', style: TextStyle(color: colorScheme.onError)),
+                                      backgroundColor: colorScheme.error,
+                                    ),
+                                  );
+                                }
+                              },
                             );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Esta receta ya no está disponible.', style: TextStyle(color: colorScheme.onError)),
-                                backgroundColor: colorScheme.error,
-                              ),
-                            );
-                          }
-                        }).catchError((error) {
-                           if (!mounted) return;
-                           print("Error fetching recipe details: $error");
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error al cargar detalles de la receta.', style: TextStyle(color: colorScheme.onError)),
-                                backgroundColor: colorScheme.error,
-                              ),
-                            );
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ).animate().fadeIn(delay: (100 * index).ms); // Animate card entrance
+
+                            if (aggRecipe.completionCount > 1) {
+                              return ExpansionTile(
+                                tilePadding: EdgeInsets.zero, 
+                                leading: null, 
+                                title: tileContent,
+                                backgroundColor: colorScheme.surfaceContainerLowest.withOpacity(0.5),
+                                childrenPadding: const EdgeInsets.only(left: 48, right: 16, bottom: 8, top:4), // Mayor indentación
+                                children: aggRecipe.allCompletionTimestamps.map((timestamp) {
+                                  final fechaOriginalItem = timestamp.toDate();
+                                  final fechaAjustadaItem = fechaOriginalItem.add(const Duration(hours: 2));
+                                  return ListTile(
+                                    dense: true,
+                                    leading: const Icon(Icons.check_circle_outline, size: 16),
+                                    title: Text(_dateFormatter!.format(fechaAjustadaItem), style: textTheme.bodySmall),
+                                  );
+                                }).toList(),
+                              );
+                            } else {
+                              return tileContent;
+                            }
+                          }).toList(),
+                        );
+                      }).toList(),
+                    ),
+                  ).animate().fadeIn(delay: (100 * categoriaIndex).ms);
+                },
+              );
             },
           );
         },
@@ -208,17 +408,16 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
     );
   }
 
-  // Helper function for category icons (remains the same)
   IconData _getCategoryIcon(String categoria) {
     switch (categoria.toLowerCase()) {
-      case 'carne': return Icons.kebab_dining_rounded; // Example alternative
+      case 'carne': return Icons.kebab_dining_rounded;
       case 'pescado': return Icons.set_meal_rounded;
-      case 'verduras': return Icons.grass_rounded; // Example alternative
-      case 'lacteos': return Icons.icecream_rounded; // Example alternative
-      case 'cereales': return Icons.breakfast_dining_rounded; // Example alternative
+      case 'verduras': return Icons.grass_rounded;
+      case 'lacteos': return Icons.icecream_rounded;
+      case 'cereales': return Icons.breakfast_dining_rounded;
       case 'postre': return Icons.cake_rounded;
       case 'bebida': return Icons.local_bar_rounded;
-      case 'pasta': return Icons.ramen_dining_rounded; // Example alternative
+      case 'pasta': return Icons.ramen_dining_rounded;
       case 'desayuno': return Icons.free_breakfast_rounded;
       default: return Icons.restaurant_rounded;
     }

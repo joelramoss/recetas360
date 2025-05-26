@@ -597,19 +597,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
     return AppBar(
       title: Text("${widget.mainCategory} / ${widget.subCategory}",
           style: textTheme.titleMedium),
-      actions: [
-        IconButton(
-            icon: const Icon(Icons.favorite_border_outlined),
-            tooltip: "Favoritos",
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const RecetasFavoritas()))),
-        IconButton(
-          icon: const Icon(Icons.history_rounded),
-          tooltip: "Historial",
-          onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const HistorialRecetas())),
-        ),
-        // Consider adding CarritoRestante if needed in this screen's AppBar
+      actions: [        // Consider adding CarritoRestante if needed in this screen's AppBar
         IconButton(
           icon: const Icon(Icons.settings_rounded),
           tooltip: "Ajustes",

@@ -25,10 +25,9 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   GoogleFonts.config.allowRuntimeFetching = false;
-  // Envuelve la aplicación con ChangeNotifierProvider
   runApp(
     ChangeNotifierProvider(
-      create: (_) => ThemeNotifier(ThemeMode.system), // Inicializa con el tema del sistema
+      create: (_) => ThemeNotifier(), // Modificado: sin argumento
       child: const MyApp(),
     ),
   );

@@ -1,133 +1,203 @@
 import 'package:flutter/material.dart';
-import 'package:recetas360/components/apiservice.dart'; // Assuming ApiService exists
-import 'producto.dart'; // Assuming Producto exists
-import 'package:flutter_animate/flutter_animate.dart'; // Import animate
+import 'package:recetas360/components/apiservice.dart';
+import 'producto.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:46:00
+// Widget Stateful para el contenido del diálogo de selección
+class _ProductSelectionDialogContent extends StatefulWidget {
+  final String ingrediente;
 
-// Function to show product selection dialog with M3 styling
-Future<Producto?> showProductoSelection(BuildContext context, String ingrediente) async {
-  // Get theme data for styling
-  final colorScheme = Theme.of(context).colorScheme;
-  final textTheme = Theme.of(context).textTheme;
+  const _ProductSelectionDialogContent({required this.ingrediente});
 
-  // --- Show Loading Dialog ---
-  showDialog(
-    context: context,
-    barrierDismissible: false, // User cannot dismiss by tapping outside
-    builder: (BuildContext dialogContext) {
-      // Use a simple Dialog for loading indicator
-      return Dialog(
-        backgroundColor: colorScheme.surfaceContainerHighest, // Use a theme background color
-         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)), // M3 Dialog shape
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: colorScheme.primary), // Themed indicator
-              const SizedBox(height: 20),
-              Text(
-                "Buscando productos...",
-                style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
+  @override
+  _ProductSelectionDialogContentState createState() =>
+      _ProductSelectionDialogContentState();
+}
 
-  // --- Perform API Search ---
-  final ApiService apiService = ApiService();
-  List<Producto> productos = [];
-  String? errorMessage;
+class _ProductSelectionDialogContentState
+    extends State<_ProductSelectionDialogContent> {
+  final ApiService _apiService = ApiService();
+  List<Producto> _productos = [];
+  int _paginaActual = 1;
+  bool _estaCargando = false;
+  bool _cargaInicialCompleta = false;
+  bool _todosLosProductosCargados = false;
+  String? _errorMensaje;
 
-  try {
-    productos = await apiService.buscarProductos(ingrediente);
-  } catch (e) {
-     print("Error searching products: $e"); // Log the error
-     errorMessage = "Error al buscar productos: ${e.toString()}";
+  @override
+  void initState() {
+    super.initState();
+    _buscarProductos(esCargaInicial: true);
   }
 
-  // --- Close Loading Dialog ---
-  // Ensure context is still valid before popping
-  if (context.mounted) {
-     // Use rootNavigator: true if the loading dialog might be on top of everything
-    Navigator.of(context, rootNavigator: true).pop();
+  Future<void> _buscarProductos({bool esCargaInicial = false}) async {
+    if (_estaCargando || (_todosLosProductosCargados && !esCargaInicial)) return;
+
+    setState(() {
+      _estaCargando = true;
+      if (esCargaInicial) {
+        _errorMensaje = null;
+        _productos.clear(); // Limpiar productos para nueva búsqueda/carga inicial
+        _paginaActual = 1;
+        _todosLosProductosCargados = false;
+        _cargaInicialCompleta = false;
+      }
+    });
+
+    try {
+      final nuevosProductos = await _apiService.buscarProductos(
+          widget.ingrediente,
+          page: _paginaActual);
+      if (!mounted) return;
+
+      setState(() {
+        _productos.addAll(nuevosProductos);
+        if (nuevosProductos.isEmpty || nuevosProductos.length < 5) { // Asumiendo page_size=5
+          _todosLosProductosCargados = true;
+        }
+        _paginaActual++;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMensaje = "Error: ${e.toString()}";
+      });
+      print("Error buscando productos: $e");
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _estaCargando = false;
+        _cargaInicialCompleta = true;
+      });
+    }
   }
 
-  // --- Show Error (if any) ---
-  if (errorMessage != null) {
-    if (context.mounted) { // Check context again
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage, style: TextStyle(color: colorScheme.onError)),
-          backgroundColor: colorScheme.error,
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    if (!_cargaInicialCompleta && _estaCargando) {
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: colorScheme.primary),
+            const SizedBox(height: 20),
+            Text(
+              "Buscando productos...",
+              style: textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+          ],
         ),
       );
     }
-    return null; // Return null on error
+
+    if (_errorMensaje != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.error, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              _errorMensaje!,
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onErrorContainer),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => _buscarProductos(esCargaInicial: true),
+              child: const Text("Reintentar"),
+            )
+          ],
+        ),
+      );
+    }
+    
+    if (_productos.isEmpty && _cargaInicialCompleta) {
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded, size: 48, color: colorScheme.secondary),
+            const SizedBox(height: 16),
+            Text(
+              "No se encontraron productos para \"${widget.ingrediente}\"",
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.maxFinite,
+      // Ajustar altura o usar Column para permitir que crezca
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // Para que el Column no ocupe toda la altura del diálogo
+        children: [
+          Flexible( // Para que el ListView no cause overflow si hay muchos items
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _productos.length,
+              itemBuilder: (_, index) {
+                final producto = _productos[index];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                  title: Text(producto.nombre, style: textTheme.bodyLarge),
+                  subtitle: Text(
+                    '${producto.valorEnergetico.toStringAsFixed(0)} kcal, ${producto.proteinas.toStringAsFixed(1)}g P, ${producto.carbohidratos.toStringAsFixed(1)}g C, ${producto.grasas.toStringAsFixed(1)}g G',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop(producto);
+                  },
+                ).animate().fadeIn(delay: (50 * index).ms);
+              },
+            ),
+          ),
+          if (_estaCargando && !_cargaInicialCompleta) // Indicador de carga para "cargar más"
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: colorScheme.primary),
+            ),
+          if (!_todosLosProductosCargados && !_estaCargando && _cargaInicialCompleta)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, bottom: 0), // Ajuste de padding
+              child: TextButton(
+                onPressed: () => _buscarProductos(),
+                child: const Text("Cargar más productos"),
+              ),
+            ),
+        ],
+      ),
+    );
   }
+}
 
-  // --- Show Selection Dialog (if context still valid) ---
-  if (!context.mounted) return null;
-
+// Función principal para mostrar el diálogo
+Future<Producto?> showProductoSelection(
+    BuildContext context, String ingrediente) async {
   return showDialog<Producto>(
     context: context,
     builder: (BuildContext dialogContext) {
-      // AlertDialog adapts to M3 automatically
       return AlertDialog(
-        // Optional: Customize shape if needed, default is usually good
-         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        // Use titleTextStyle from theme
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         title: Text('Selecciona para "$ingrediente"'),
-        // Constrain content size and use themed list
-        content: SizedBox(
-          width: double.maxFinite, // Take available width
-          height: 300, // Fixed height for the list area
-          child: productos.isEmpty
-              ? Center(
-                  child: Column( // Center icon and text
-                     mainAxisSize: MainAxisSize.min,
-                     children: [
-                       Icon(Icons.search_off_rounded, size: 48, color: colorScheme.secondary),
-                       const SizedBox(height: 16),
-                       Text(
-                         "No se encontraron productos",
-                         textAlign: TextAlign.center,
-                         style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                       ),
-                     ],
-                  )
-                )
-              : ListView.builder(
-                  shrinkWrap: true, // Important inside SizedBox
-                  itemCount: productos.length,
-                  itemBuilder: (_, index) {
-                    final producto = productos[index];
-                    // Themed ListTile
-                    return ListTile(
-                       contentPadding: const EdgeInsets.symmetric(horizontal: 8.0), // Adjust padding
-                       title: Text(producto.nombre, style: textTheme.bodyLarge),
-                       subtitle: Text(
-                         // Format nutritional info more clearly
-                         '${producto.valorEnergetico.toStringAsFixed(0)} kcal, ${producto.proteinas.toStringAsFixed(1)}g P, ${producto.carbohidratos.toStringAsFixed(1)}g C, ${producto.grasas.toStringAsFixed(1)}g G',
-                         style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                       ),
-                       onTap: () {
-                         Navigator.of(dialogContext).pop(producto); // Return selected product
-                       },
-                    ).animate().fadeIn(delay: (50 * index).ms); // Animate list items
-                  },
-                ),
-        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 20.0), // Ajustar padding del content
+        content: _ProductSelectionDialogContent(ingrediente: ingrediente),
         actions: [
-          // Themed TextButton
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(), // Return null (cancel)
-            child: const Text("Cancelar"), // Text color uses theme default
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text("Cancelar"),
           ),
         ],
       );

@@ -46,10 +46,16 @@ class _EditarRecetaState extends State<EditarReceta> {
   List<TextEditingController> _stepControllers = [];
   double _calificacion = 3.0;
 
+  // --- Nuevas variables de estado para añadir pasos ---
+  final TextEditingController _newStepController = TextEditingController();
+  bool _isAddingNewStep = false;
+  final FocusNode _newStepFocusNode = FocusNode();
+  // --- Fin nuevas variables ---
+
   File? _selectedImageFile;
   String? _currentImageUrl;
   final StorageService _storageService = StorageService();
-  final ImagePickerService _imagePickerService = ImagePickerService(); // Instancia del servicio
+  final ImagePickerService _imagePickerService = ImagePickerService();
 
   bool _isSaving = false;
   NutritionalInfo _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
@@ -100,6 +106,8 @@ class _EditarRecetaState extends State<EditarReceta> {
     for (var c in _stepControllers) {
       c.dispose();
     }
+    _newStepController.dispose(); // Dispose nuevo controlador
+    _newStepFocusNode.dispose(); // Dispose nuevo focus node
     super.dispose();
   }
 
@@ -201,7 +209,42 @@ class _EditarRecetaState extends State<EditarReceta> {
   }
 
   void _addIngredient() => setState(() => _ingredients.add(IngredientSelection(name: '')));
-  void _addStep() => setState(() => _stepControllers.add(TextEditingController()));
+  
+  void _addStep() {
+    setState(() {
+      _isAddingNewStep = true;
+    });
+    // Solicitar foco después de que el widget se construya
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) { // Asegurarse que el widget sigue montado
+        FocusScope.of(context).requestFocus(_newStepFocusNode);
+      }
+    });
+  }
+
+  void _confirmAndAddStep() {
+    final newStepText = _newStepController.text.trim();
+    if (newStepText.isNotEmpty) {
+      setState(() {
+        _stepControllers.add(TextEditingController(text: newStepText));
+        _newStepController.clear();
+        _isAddingNewStep = false;
+      });
+    } else {
+      // Si está vacío, simplemente ocultamos la UI de añadir y limpiamos
+      setState(() {
+        _newStepController.clear();
+        _isAddingNewStep = false;
+      });
+    }
+  }
+
+  void _cancelAddNewStep() {
+    setState(() {
+      _newStepController.clear();
+      _isAddingNewStep = false;
+    });
+  }
 
    Widget _buildSectionHeader(BuildContext context, String title) {
      return Padding(
@@ -491,9 +534,57 @@ class _EditarRecetaState extends State<EditarReceta> {
               child: TextButton.icon(
                 icon: const Icon(Icons.add_circle_outline_rounded),
                 label: const Text("Añadir Paso"),
-                onPressed: _isSaving ? null : _addStep,
+                onPressed: _isSaving || _isAddingNewStep ? null : _addStep,
               ),
             ),
+
+            // --- UI para añadir nuevo paso (condicional) ---
+            if (_isAddingNewStep)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _newStepController,
+                      focusNode: _newStepFocusNode,
+                      decoration: kInputDecoration(
+                        context: context,
+                        labelText: "Nuevo paso",
+                        hintText: "Describe el nuevo paso...",
+                        isDense: true,
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLines: null, 
+                      keyboardType: TextInputType.multiline,
+                      validator: (value) {
+                        // Opcional: puedes añadir una validación aquí si es necesario
+                        // antes de permitir que se guarde, aunque _confirmAndAddStep ya verifica si está vacío.
+                        // if (value == null || value.trim().isEmpty) {
+                        //   return 'El paso no puede estar vacío';
+                        // }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: _cancelAddNewStep,
+                          child: const Text("Cancelar"),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _confirmAndAddStep,
+                          child: const Text("Aceptar"),
+                        ),
+                      ],
+                    ),
+                  ],
+                ).animate().fadeIn().slideY(begin: 0.2),
+              ),
+            // --- Fin UI para añadir nuevo paso ---
 
              _buildSectionHeader(context, "Información Nutricional (Estimada)"),
              Card(

@@ -103,20 +103,6 @@ class _PantallaGastronomiasState extends State<PantallaGastronomias>
         title: Text(widget.tipoAlimento),
         actions: [
           IconButton(
-              icon: const Icon(Icons.favorite_border_outlined),
-              tooltip: "Favoritos",
-              onPressed: () => _navigateTo(const RecetasFavoritas())),
-          IconButton(
-              icon: const Icon(Icons.history_outlined),
-              tooltip: "Historial",
-              onPressed: () => _navigateTo(const HistorialRecetas())),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            iconSize: 25,
-            tooltip: "Carrito",
-            onPressed: () => _navigateTo(const CarritoFaltantes()),
-          ),
-          IconButton(
             icon: const Icon(Icons.settings),
             iconSize: 25,
             tooltip: "Ajustes",
