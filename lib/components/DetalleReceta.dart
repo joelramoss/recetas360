@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // Necessary for date formatting
 import 'package:flutter_animate/flutter_animate.dart'; // Import flutter_animate
 import 'package:shimmer/shimmer.dart'; // Import shimmer for comment loading
+import 'package:intl/date_symbol_data_local.dart'; // Necesario para initializeDateFormatting
 
 // Current User's Login: joelramoss
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:04:29
@@ -39,10 +40,29 @@ class _DetalleRecetaState extends State<DetalleReceta> {
   @override
   void initState() {
     super.initState();
+    _initializeDateFormatting(); // Llama a la inicialización aquí
     _uidActual = _usuarioUtil.getUidUsuarioActual();
-    _cargarIngredientesFaltantes(); // Load missing ingredients state
+    _cargarIngredientesFaltantes(); 
     _cargarComentariosIniciales();
     _scrollController.addListener(_scrollListener);
+  }
+
+  // Nuevo método para encapsular la inicialización
+  Future<void> _initializeDateFormatting() async {
+    try {
+      // Inicializa para el locale 'es_ES'.
+      // El segundo parámetro `null` significa que usará los datos de formato por defecto para ese locale.
+      await initializeDateFormatting('es_ES', null);
+      print("Formato de fecha inicializado para 'es_ES'.");
+      // Si quieres soportar múltiples locales o el locale por defecto del sistema de forma más robusta,
+      // podrías necesitar una lógica más avanzada aquí o llamar a initializeDateFormatting
+      // para el locale detectado del dispositivo.
+    } catch (e) {
+      print("Error al inicializar el formato de fecha para 'es_ES': $e");
+      // Considera si necesitas manejar este error de alguna manera específica.
+      // Incluso si esto falla, el DateFormat sin locale en tu fallback debería funcionar
+      // con el formato por defecto del sistema, pero la conversión .toLocal() sigue siendo la clave.
+    }
   }
 
   Future<void> _cargarIngredientesFaltantes() async {
@@ -192,14 +212,20 @@ class _DetalleRecetaState extends State<DetalleReceta> {
 
   String _formatearFecha(DateTime fecha) {
     try {
-      // Asegúrate de que el DateTime esté en la zona horaria local antes de formatear
-      final localDate = fecha.toLocal();
-      return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(localDate);
+      // Imprime la fecha original UTC para depuración
+      print("Fecha Original (UTC desde Firestore): ${fecha.toIso8601String()}");
+
+      // Sumar 2 horas directamente a la fecha UTC
+      final fechaConDosHorasMas = fecha.add(const Duration(hours: 2));
+      print("Fecha con 2 horas sumadas: ${fechaConDosHorasMas.toIso8601String()}");
+      
+      // Formatear esta nueva fecha. Ya no se llama a .toLocal()
+      return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(fechaConDosHorasMas);
     } catch (e) {
        print("Error formateando fecha con intl locale 'es_ES': $e. Usando formato simple.");
-       // Fallback con conversión a local también
-       final localDate = fecha.toLocal();
-       return DateFormat('dd/MM/yyyy HH:mm').format(localDate);
+       // Fallback, también sumando 2 horas
+       final fechaConDosHorasMasFallback = fecha.add(const Duration(hours: 2));
+       return DateFormat('dd/MM/yyyy HH:mm').format(fechaConDosHorasMasFallback);
     }
   }
 

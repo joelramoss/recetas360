@@ -146,6 +146,33 @@ class FirebaseService {
       // o manejarlo de forma diferente aquí.
     }
   }
+
+  /// Obtiene el nombre de un usuario a partir de su UID.
+  ///
+  /// [userId] El UID del usuario a buscar.
+  /// Retorna el nombre del usuario si se encuentra.
+  /// Retorna "SISTEMA" si el userId está vacío (indicando creación por sistema).
+  /// Retorna "Usuario desconocido" si el usuario no se encuentra o hay un error.
+  Future<String> obtenerNombreUsuarioPorId(String? userId) async { // Acepta String?
+    if (userId == null || userId.isEmpty) { // Comprueba null o vacío
+      return "SISTEMA"; 
+    }
+    try {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('usuarios').doc(userId).get();
+
+      if (userDoc.exists) {
+        return (userDoc.data() as Map<String, dynamic>?)?['nombre'] as String? ??
+            "Usuario desconocido";
+      } else {
+        // Si el userId no está vacío pero el usuario no existe
+        return "Usuario desconocido"; 
+      }
+    } catch (e) {
+      print('Error al obtener nombre de usuario por ID ($userId): $e');
+      return "Usuario desconocido"; 
+    }
+  }
 } // Fin de la clase FirebaseService
 
 // Clase para manejar las operaciones de Firebase Storage
