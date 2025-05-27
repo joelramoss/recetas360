@@ -13,6 +13,7 @@ import 'package:recetas360/serveis/ThemeNotifier.dart'; // Importa tu ThemeNotif
 import 'firebase_options.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/scheduler.dart'; // Importar SchedulerBinding
 
 /// Constantes de colecciones y documentos
 class FirebaseConstants {
@@ -44,6 +45,7 @@ class _MyAppState extends State<MyApp> {
   final analytics = FirebaseAnalytics.instance;
   final functions = FirebaseFunctions.instance;
   bool _isInitialized = false;
+  PendingDynamicLinkData? _initialLinkData; // Para almacenar el enlace inicial
 
   @override
   void initState() {
@@ -52,7 +54,29 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initializeApplication() async {
-    await _initDynamicLinks();
+    // 1. Configurar el listener para enlaces cuando la app ya está abierta o en segundo plano
+    FirebaseDynamicLinks.instance.onLink.listen(
+      (dynamicLinkData) {
+        if (dynamicLinkData != null) {
+          analytics.logEvent(
+            name: 'dynamic_link_received_active_app',
+            parameters: {'link': dynamicLinkData.link.toString()},
+          );
+          // Usar addPostFrameCallback para manejar el enlace después de que el frame actual se complete
+          // Esto es útil si la app está activa y la UI podría estar en transición.
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            _handleDeepLink(dynamicLinkData.link);
+          });
+        }
+      },
+      onError: (e) {
+        analytics.logEvent(
+          name: 'dynamic_link_onlink_error',
+          parameters: {'error': e.toString()},
+        );
+      },
+    );
+
     analytics.logAppOpen();
 
     final prefs = await SharedPreferences.getInstance();
@@ -62,7 +86,30 @@ class _MyAppState extends State<MyApp> {
       await prefs.setBool('checkedMigration', true);
     }
 
-    if (mounted) setState(() => _isInitialized = true);
+    // 2. Obtener el enlace inicial (si la app se abrió desde uno)
+    // Hacemos esto ANTES de marcar _isInitialized = true, pero lo procesaremos DESPUÉS.
+    try {
+      _initialLinkData = await FirebaseDynamicLinks.instance.getInitialLink();
+      if (_initialLinkData != null) {
+        analytics.logEvent(
+          name: 'dynamic_link_initial_captured',
+          parameters: {'link': _initialLinkData!.link.toString()},
+        );
+      } else {
+        analytics.logEvent(name: 'dynamic_link_initial_null_captured');
+      }
+    } catch (e) {
+      analytics.logEvent(
+        name: 'dynamic_link_initial_capture_error',
+        parameters: {'error': e.toString()},
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
   }
 
   Future<void> _launchBackgroundMigration() async {
@@ -97,52 +144,12 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Future<void> _initDynamicLinks() async {
-    FirebaseDynamicLinks.instance.onLink.listen(
-      (dynamicLinkData) {
-        if (dynamicLinkData != null) {
-          analytics.logEvent(
-            name: 'dynamic_link_received',
-            parameters: {'link': dynamicLinkData.link.toString()},
-          );
-          _handleDeepLink(dynamicLinkData.link);
-        }
-      },
-      onError: (e) {
-        analytics.logEvent(
-          name: 'dynamic_link_onlink_error',
-          parameters: {'error': e.toString()},
-        );
-      },
-    );
-
-    try {
-      final initialLink = await FirebaseDynamicLinks.instance.getInitialLink();
-      if (initialLink != null) {
-        analytics.logEvent(
-          name: 'dynamic_link_initial_received',
-          parameters: {'link': initialLink.link.toString()},
-        );
-        _handleDeepLink(initialLink.link);
-      } else {
-        analytics.logEvent(name: 'dynamic_link_initial_null');
-      }
-    } catch (e) {
-      analytics.logEvent(
-        name: 'dynamic_link_initial_error',
-        parameters: {'error': e.toString()},
-      );
-    }
-  }
+  // _initDynamicLinks ya no es necesaria como función separada con esta estructura.
 
   void _handleDeepLink(Uri deepLink) async {
-    if (!_isInitialized) {
-      // Espera a que _isInitialized sea true o usa un Completer si es necesario
-      // para una sincronización más robusta.
-      await Future.doWhile(() => !_isInitialized);
-    }
+    // Esta función ahora se llama cuando es seguro navegar.
     analytics.logEvent(
-      name: 'handle_deep_link',
+      name: 'handle_deep_link_invoked',
       parameters: {'link': deepLink.toString()},
     );
     if (deepLink.pathSegments.contains('receta')) {
@@ -157,12 +164,17 @@ class _MyAppState extends State<MyApp> {
             final receta = Receta.fromFirestore(
                 doc.data()! as Map<String, dynamic>, doc.id);
             final state = navigatorKey.currentState;
-            if (state != null) {
+            if (state != null && state.mounted) { // Comprobar si el navigator está montado
               state.push(MaterialPageRoute(
                   builder: (_) => DetalleReceta(receta: receta)));
               analytics.logEvent(
-                name: 'deep_link_recipe_found',
+                name: 'deep_link_recipe_found_navigated',
                 parameters: {'recipe_id': id},
+              );
+            } else {
+              analytics.logEvent(
+                name: 'deep_link_navigator_not_ready',
+                parameters: {'recipe_id': id, 'state_null': state == null, 'state_mounted': state?.mounted ?? false},
               );
             }
           } else {
@@ -183,26 +195,35 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Accede al ThemeNotifier
     final themeNotifier = Provider.of<ThemeNotifier>(context);
+    final poppins = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
 
-    final poppins = GoogleFonts.poppinsTextTheme(
-      Theme.of(context).textTheme,
-    );
     if (!_isInitialized) {
       return MaterialApp(
-        navigatorKey: navigatorKey,
+        navigatorKey: navigatorKey, // Es importante tener el navigatorKey aquí también
         debugShowCheckedModeBanner: false,
         home: const Scaffold(
-          backgroundColor: Colors.black, // O un color de tu tema oscuro base
+          backgroundColor: Colors.black,
           body: Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(Colors.white), // O un color de tu tema claro
+              valueColor: AlwaysStoppedAnimation(Colors.white),
             ),
           ),
         ),
       );
     }
+
+    // 3. Procesar el enlace inicial DESPUÉS de que _isInitialized es true y la UI principal se construye.
+    if (_initialLinkData != null) {
+      // Usar addPostFrameCallback para asegurar que el primer frame del MaterialApp principal esté construido.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_initialLinkData != null) { // Doble chequeo por si acaso
+           _handleDeepLink(_initialLinkData!.link);
+          _initialLinkData = null; // Limpiar para que no se procese de nuevo en reconstrucciones.
+        }
+      });
+    }
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
@@ -244,7 +265,7 @@ class _MyAppState extends State<MyApp> {
         textTheme: poppins,
         primaryTextTheme: poppins,
       ),
-      themeMode: themeNotifier.themeMode, // Usa el themeMode del notifier
+      themeMode: themeNotifier.themeMode, 
       home: const Paginalogin(),
       navigatorObservers: [
         FirebaseAnalyticsObserver(analytics: analytics),
