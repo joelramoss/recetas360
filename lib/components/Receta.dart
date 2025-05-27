@@ -10,6 +10,7 @@ class Receta {
   final String categoria;
   final String gastronomia;
   final List<String> pasos;
+  final String? creadorId; // Nuevo campo
 
   Receta({
     this.id = '',
@@ -23,6 +24,7 @@ class Receta {
     required this.categoria,
     required this.gastronomia,
     required this.pasos,
+    this.creadorId, // Añadir al constructor
   });
 
   Map<String, dynamic> toMap() {
@@ -37,6 +39,7 @@ class Receta {
       'categoria': categoria,
       'gastronomia': gastronomia,
       'pasos': pasos,
+      'creadorId': creadorId, // Añadir al mapa
     };
   }
 
@@ -54,6 +57,7 @@ class Receta {
       categoria: data['categoria'] ?? '',
       gastronomia: data['gastronomia'] ?? '',
       pasos: List<String>.from(data['pasos'] ?? []),
+      creadorId: data['creadorId'] as String?, // Leer desde Firestore
     );
   }
 }

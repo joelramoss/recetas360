@@ -13,9 +13,10 @@ import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:firebase_storage/firebase_storage.dart'; // Asegúrate de tener esta importación
+import 'package:recetas360/FirebaseServices.dart'; // Asegúrate de importar FirebaseService
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:49:18
+// Definir el email del administrador
+const String adminEmail = 'admin@gmail.com'; // Cambia esto por el email de tu administrador
 
 class ListaRecetas extends StatefulWidget {
   final String mainCategory;
@@ -32,6 +33,8 @@ class ListaRecetas extends StatefulWidget {
 }
 
 class _ListaRecetasState extends State<ListaRecetas> {
+  final FirebaseService _firebaseService = FirebaseService(); // Instanciar FirebaseService
+
   // --- Helper: Shimmer Placeholder Card ---
   Widget _buildShimmerCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -125,8 +128,13 @@ class _ListaRecetasState extends State<ListaRecetas> {
                     curve: Curves.easeOut),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CrearRecetaScreen())),
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => CrearRecetaScreen(
+                            initialCategoria: widget.mainCategory,
+                            initialGastronomia: widget.subCategory,
+                          ))),
               icon: const Icon(Icons.add_circle_outline_rounded),
               label: const Text("Crear la Primera Receta"),
             )
@@ -226,10 +234,26 @@ class _ListaRecetasState extends State<ListaRecetas> {
   }
 
   // --- Helper: Delete Recipe ---
-  Future<void> _deleteRecipe(BuildContext context, Receta receta) async {
+  Future<void> _deleteRecipe(BuildContext context, Receta receta, String? currentUserId, String? currentUserEmail) async {
     final colorScheme = Theme.of(context).colorScheme;
     final String recipeId = receta.id;
     final String imageUrl = receta.urlImagen;
+
+    // Verificar si el usuario actual es el creador de la receta O si es el administrador
+    final bool esCreadorOriginal = receta.creadorId == currentUserId;
+    final bool esAdmin = currentUserEmail == adminEmail;
+
+    if (!esCreadorOriginal && !esAdmin) {
+      print("Error: El usuario actual (${currentUserId ?? 'N/A'}, ${currentUserEmail ?? 'N/A'}) no es el creador ni admin y no puede eliminarla.");
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("No tienes permiso para eliminar esta receta.", style: TextStyle(color: colorScheme.onError)),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+      return;
+    }
 
     try {
       // 1. Eliminar el documento de Firestore
@@ -247,6 +271,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
         } catch (e) {
           print(
               "Error al eliminar imagen de Storage ($imageUrl): $e. Puede que necesites guardar la ruta de Storage en Firestore para una eliminación más fiable o que la URL no sea compatible con refFromURL.");
+          // Considerar si se debe notificar al usuario de este error específico
         }
       }
 
@@ -319,7 +344,9 @@ class _ListaRecetasState extends State<ListaRecetas> {
     const double starSize = 18.0;
     const double imageSize = 80.0;
 
-    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final userId = currentUser?.uid;
+    final userEmail = currentUser?.email;
 
     return StreamBuilder<QuerySnapshot>(
       stream: userId != null
@@ -329,7 +356,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
               .collection('favoritos')
               .snapshots()
           : Stream<QuerySnapshot<Map<String, dynamic>>>.value(
-              QuerySnapshotData([], {})), // Empty snapshot for logged-out users
+              QuerySnapshotData([], {})),
       builder: (context, favoritesSnapshot) {
         if (userId != null &&
             favoritesSnapshot.connectionState == ConnectionState.waiting) {
@@ -385,7 +412,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                   left: cardPadding,
                   right: cardPadding,
                   top: cardPadding,
-                  bottom: cardPadding + (recipesExist ? 72 : 0), // Space for FAB
+                  bottom: cardPadding + (recipesExist ? 72 : 0),
                 ),
                 itemCount: recetasDocs.length,
                 itemBuilder: (context, index) {
@@ -395,11 +422,12 @@ class _ListaRecetasState extends State<ListaRecetas> {
                   if (data == null ||
                       data['nombre'] == null ||
                       data['urlImagen'] == null) {
-                    return const SizedBox.shrink(); // Skip invalid item
+                    return const SizedBox.shrink();
                   }
 
                   final receta = Receta.fromFirestore(data, doc.id);
                   final bool isFavorite = favoriteIds.contains(receta.id);
+                  final bool tienePermisos = (userId != null && receta.creadorId == userId) || (userEmail == adminEmail);
 
                   return GestureDetector(
                     onTap: () => Navigator.push(
@@ -450,7 +478,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                                     .surfaceContainerHighest,
                                                 highlightColor: colorScheme
                                                     .surfaceContainerHighest
-                                                    .withOpacity(0.5),
+                                                    .withAlpha((255 * 0.5).round()), // Cambiado de withOpacity
                                                 child: Container(
                                                     decoration: BoxDecoration(
                                                         color: Colors.white,
@@ -487,13 +515,61 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                               size: starSize,
                                             )),
                                   ),
+                                  const SizedBox(height: 6), 
+                                  FutureBuilder<String>(
+                                    future: _firebaseService.obtenerNombreUsuarioPorId(receta.creadorId), 
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        if (receta.creadorId != null && receta.creadorId!.isNotEmpty) {
+                                           return Text("Cargando autor...", style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic));
+                                        } else {
+                                          return const SizedBox.shrink(); 
+                                        }
+                                      }
+                                      
+                                      if (snapshot.hasData) {
+                                        String resultText = snapshot.data!;
+                                        String authorName; // Nombre base: "Sistema", "Usuario desconocido" o el nombre real
+
+                                        if (resultText == "SISTEMA") {
+                                          authorName = "Sistema";
+                                        } else if (resultText == "Usuario desconocido") {
+                                          // Solo usar "Usuario desconocido" si originalmente había un creadorId
+                                          if (receta.creadorId != null && receta.creadorId!.isNotEmpty) {
+                                            authorName = "Usuario desconocido";
+                                          } else {
+                                            authorName = "Sistema"; // Fallback si creadorId era nulo/vacío
+                                          }
+                                        } else {
+                                          authorName = resultText; // Nombre real del usuario
+                                        }
+                                        
+                                        // Aplicar el formato unificado
+                                        String finalTextToShow = "Creado por: $authorName";
+                                        
+                                        return Text(
+                                          finalTextToShow,
+                                          style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        );
+                                      } else if (snapshot.hasError) {
+                                        print("Error en FutureBuilder para nombre de creador: ${snapshot.error}");
+                                        // Opcional: Mostrar un texto de error genérico con el formato
+                                        // return Text("Creado por: Error", style: textTheme.bodySmall?.copyWith(color: colorScheme.error, fontStyle: FontStyle.italic));
+                                        return const SizedBox.shrink(); 
+                                      }
+                                      
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
                                 ],
                               ),
                             ),
                             // Action Icons Column
                             Column(
                               mainAxisAlignment: MainAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min, // Important for Row layout
+                              mainAxisSize: MainAxisSize.min, 
                               children: [
                                 IconButton(
                                   icon: Icon(isFavorite
@@ -511,17 +587,19 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                           receta.id, isFavorite),
                                   visualDensity: VisualDensity.compact,
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_note_rounded),
-                                  color: colorScheme.secondary,
-                                  tooltip: "Editar",
-                                  onPressed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) =>
-                                              EditarReceta(receta: receta))),
-                                  visualDensity: VisualDensity.compact,
-                                ),
+                                // Solo mostrar botón de editar si tiene permisos
+                                if (tienePermisos)
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_note_rounded),
+                                    color: colorScheme.secondary,
+                                    tooltip: "Editar",
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                EditarReceta(receta: receta))),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
                                 IconButton(
                                   icon: const Icon(Icons.share_rounded),
                                   color: colorScheme.tertiary,
@@ -529,34 +607,37 @@ class _ListaRecetasState extends State<ListaRecetas> {
                                   onPressed: () => _shareRecipe(context, receta),
                                   visualDensity: VisualDensity.compact,
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_forever_rounded),
-                                  color: colorScheme.error,
-                                  tooltip: "Eliminar",
-                                  onPressed: () async {
-                                    final confirm =
-                                        await _showDeleteConfirmationDialog(
-                                            context);
-                                    if (confirm == true) {
-                                      _deleteRecipe(context, receta);
-                                    }
-                                  },
-                                  visualDensity: VisualDensity.compact,
-                                ),
+                                // Solo mostrar botón de eliminar si tiene permisos
+                                if (tienePermisos)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_forever_rounded),
+                                    color: colorScheme.error,
+                                    tooltip: "Eliminar",
+                                    onPressed: () async {
+                                      final confirm =
+                                          await _showDeleteConfirmationDialog(
+                                              context);
+                                      if (confirm == true) {
+                                        // Pasar userId y userEmail a _deleteRecipe
+                                        _deleteRecipe(context, receta, userId, userEmail);
+                                      }
+                                    },
+                                    visualDensity: VisualDensity.compact,
+                                  ),
                               ],
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  )
+                    )
                       .animate()
                       .fadeIn(duration: 400.ms, delay: (50 * (index % 10)).ms)
                       .slideY(
                           begin: 0.1,
                           duration: 300.ms,
                           delay: (50 * (index % 10)).ms,
-                          curve: Curves.easeOut);
+                          curve: Curves.easeOut),
+                );
                 },
               );
             }
@@ -564,12 +645,15 @@ class _ListaRecetasState extends State<ListaRecetas> {
             return Scaffold(
               appBar: _buildAppBar(context, textTheme),
               body: body,
-              floatingActionButton: recipesExist
+              floatingActionButton: recipesExist // O siempre visible si lo prefieres
                   ? FloatingActionButton.extended(
                       onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const CrearRecetaScreen())),
+                              builder: (_) => CrearRecetaScreen( // Pasar parámetros
+                                    initialCategoria: widget.mainCategory,
+                                    initialGastronomia: widget.subCategory,
+                                  ))),
                       icon: const Icon(Icons.add_rounded),
                       label: const Text("Crear Receta"),
                     ).animate().slideY(
@@ -577,7 +661,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
                       delay: 500.ms,
                       duration: 500.ms,
                       curve: Curves.easeOut)
-                  : null,
+                  : null, // Si es null, el botón de _buildEmptyState se encargará si la lista está vacía
             );
           },
         );
@@ -589,19 +673,7 @@ class _ListaRecetasState extends State<ListaRecetas> {
     return AppBar(
       title: Text("${widget.mainCategory} / ${widget.subCategory}",
           style: textTheme.titleMedium),
-      actions: [
-        IconButton(
-            icon: const Icon(Icons.favorite_border_outlined),
-            tooltip: "Favoritos",
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const RecetasFavoritas()))),
-        IconButton(
-          icon: const Icon(Icons.history_rounded),
-          tooltip: "Historial",
-          onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const HistorialRecetas())),
-        ),
-        // Consider adding CarritoRestante if needed in this screen's AppBar
+      actions: [        // Consider adding CarritoRestante if needed in this screen's AppBar
         IconButton(
           icon: const Icon(Icons.settings_rounded),
           tooltip: "Ajustes",

@@ -27,19 +27,27 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
-      setState(() {
-        _userId = user.uid; // Obtener el userId del usuario autenticado
-      });
+      if (mounted) { // Es una buena práctica verificar si el widget sigue montado
+        setState(() {
+          _userId = user.uid; // Obtener el userId del usuario autenticado
+        });
+        // Llamar a _loadUserFavorites DESPUÉS de obtener el userId
+        await _loadUserFavorites(user.uid); 
+      }
     } else {
       // Si no hay usuario autenticado, manejar este caso
-      setState(() {
-        _userId = "";
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text("Debes iniciar sesión para ver tus recetas favoritas.")),
-      );
+      if (mounted) {
+        setState(() {
+          _userId = ""; // O puedes optar por mantenerlo null y manejarlo diferente en el build
+        });
+        if (context.mounted) { // Asegurarse que el contexto es válido para el SnackBar
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text("Debes iniciar sesión para ver tus recetas favoritas.")),
+          );
+        }
+      }
     }
   }
 
@@ -50,11 +58,13 @@ class _RecetasFavoritasState extends State<RecetasFavoritas> {
           .doc(userId)
           .collection('favoritos')
           .get();
-      final favorites = <String, bool>{};
+      final loadedFavorites = <String, bool>{}; // Usar un mapa temporal
       for (var doc in favoritesSnapshot.docs) {
-        favorites[doc.id] = true;
+        loadedFavorites[doc.id] = true;
       }
-      if (mounted) setState(() => _favorites = favorites);
+      if (mounted) {
+        setState(() => _favorites = loadedFavorites); // Actualizar el estado una vez
+      }
     } catch (e) {
       print("Error al cargar favoritos: $e");
       if (mounted) {
