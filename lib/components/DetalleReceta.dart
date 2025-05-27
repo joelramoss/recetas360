@@ -8,6 +8,7 @@ import 'package:intl/intl.dart'; // Necessary for date formatting
 import 'package:flutter_animate/flutter_animate.dart'; // Import flutter_animate
 import 'package:shimmer/shimmer.dart'; // Import shimmer for comment loading
 import 'package:intl/date_symbol_data_local.dart'; // Necesario para initializeDateFormatting
+import 'package:recetas360/components/nutritionalifno.dart'; // Asegúrate que esta importación esté presente
 
 // Current User's Login: joelramoss
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:04:29
@@ -544,6 +545,18 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     final textTheme = Theme.of(context).textTheme;
     final screenHeight = MediaQuery.of(context).size.height;
 
+    // Convertir el mapa de nutritionalInfo a un objeto NutritionalInfo
+    NutritionalInfo? infoNutricional;
+    if (widget.receta.nutritionalInfo != null && widget.receta.nutritionalInfo!.isNotEmpty) {
+      try {
+        infoNutricional = NutritionalInfo.fromMap(widget.receta.nutritionalInfo!);
+      } catch (e) {
+        print("Error al parsear nutritionalInfo desde Firestore: $e");
+        // Opcional: mostrar un mensaje al usuario o usar valores por defecto
+        infoNutricional = null; 
+      }
+    }
+
     return Scaffold(
       body: GestureDetector(
          onTap: () => FocusScope.of(context).unfocus(),
@@ -582,9 +595,9 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                 ),
                  stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
               ),
-               actions: [ // Actions for SliverAppBar
+               actions: [ 
                 // IconButton(
-                //   icon: const Icon(Icons.shopping_cart_outlined), // Use outlined for consistency
+                //   icon: const Icon(Icons.shopping_cart_outlined), 
                 //   tooltip: "Ver faltantes",
                 //   onPressed: () => _mostrarIngredientesFaltantes(context),
                 // ),
@@ -617,8 +630,80 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                     )).toList()
                   ).animate().fadeIn(delay: 400.ms),
                   const Divider(height: 32, thickness: 1),
+                  
+                  Text("Descripción", style: textTheme.titleLarge),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.receta.descripcion.isEmpty ? "No hay descripción disponible." : widget.receta.descripcion,
+                    style: textTheme.bodyLarge?.copyWith(height: 1.5),
+                    textAlign: TextAlign.justify,
+                  ).animate().fadeIn(delay: 500.ms),
+                  const SizedBox(height: 20), // Espacio antes de la info nutricional
+
+                  // --- SECCIÓN DE INFORMACIÓN NUTRICIONAL ---
+                  if (infoNutricional != null) ...[
+                    Text(
+                      "Información Nutricional (Estimada)", // Título de la sección
+                      style: textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0, // Diseño sutil, sin mucha elevación
+                      color: colorScheme.surfaceContainerHighest.withOpacity(0.7), // Un color de fondo suave
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildNutrientRow(context, "Calorías:", "${infoNutricional.energy.toStringAsFixed(0)} kcal"),
+                            const SizedBox(height: 6),
+                            _buildNutrientRow(context, "Proteínas:", "${infoNutricional.proteins.toStringAsFixed(1)} g"),
+                            const SizedBox(height: 6),
+                            _buildNutrientRow(context, "Carbohidratos:", "${infoNutricional.carbs.toStringAsFixed(1)} g"),
+                            const SizedBox(height: 6),
+                            _buildNutrientRow(context, "Grasas Totales:", "${infoNutricional.fats.toStringAsFixed(1)} g"),
+                            const SizedBox(height: 6),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16.0), 
+                              child: _buildNutrientRow(context, "Grasas Saturadas:", "${infoNutricional.saturatedFats.toStringAsFixed(1)} g"),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 550.ms), // Animación para la tarjeta
+                    const Divider(height: 32, thickness: 1), // Divisor después de la info nutricional
+                  ] else if (widget.receta.nutritionalInfo != null && widget.receta.nutritionalInfo!.isEmpty) ...[
+                     // Caso donde el mapa existe pero está vacío (podría significar que no se pudo calcular)
+                    Text(
+                      "Información Nutricional",
+                      style: textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "No se pudo estimar la información nutricional para esta receta.",
+                      style: textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic, color: colorScheme.onSurfaceVariant),
+                    ),
+                    const Divider(height: 32, thickness: 1),
+                  ],
+                  // Si infoNutricional es null y widget.receta.nutritionalInfo también es null, no se muestra nada.
+                  // Podrías añadir un else para un mensaje genérico si lo deseas.
+                  // --- FIN SECCIÓN DE INFORMACIÓN NUTRICIONAL ---
+                  
+                  const SizedBox(height: 10), // Espacio antes del botón
+
+                  Center(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14), textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PasosRecetaScreen(receta: widget.receta))),
+                      icon: const Icon(Icons.play_circle_fill_rounded),
+                      label: const Text("Iniciar Preparación"),
+                    )
+                  ).animate().fadeIn(delay: 600.ms).shake(hz: 3, duration: 400.ms),
+                  const Divider(height: 40, thickness: 1),
 
                   // --- INGREDIENTES POR COMPRAR ---
+                  // Tu código existente para "Ingredientes por comprar"
                   Text(
                     "Ingredientes por comprar:",
                     style: textTheme.titleLarge,
@@ -631,14 +716,8 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                       onChanged: (bool? value) async {
                         setState(() {
                           _ingredientesSeleccionados[ing] = value ?? false;
-                          // Update _ingredientesFaltantes based on the checkbox
-                          // If checked (user has it), it's NOT faltante.
-                          // If unchecked (user doesn't have it), it IS faltante.
                           _ingredientesFaltantes[ing] = !(value ?? true);
                         });
-                        // No need to call _guardarIngredientesFaltantes here,
-                        // _actualizarCarrito will handle the specific ingredient.
-                        // Or, if you prefer, call _guardarIngredientesFaltantes after all changes.
                         await _actualizarCarrito(ing, !(value ?? true));
                       },
                       controlAffinity: ListTileControlAffinity.leading,
@@ -650,36 +729,17 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       ElevatedButton(
-                        onPressed: () => _marcarTodos(false), // Marcar todos como "NO FALTANTES" (checkboxes ON)
+                        onPressed: () => _marcarTodos(false), 
                         child: const Text("Tengo todo"),
                       ),
                       ElevatedButton(
-                        onPressed: () => _marcarTodos(true), // Marcar todos como "FALTANTES" (checkboxes OFF)
+                        onPressed: () => _marcarTodos(true), 
                         child: const Text("No tengo nada"),
                       ),
                     ],
                   ),
                   const Divider(height: 32, thickness: 1),
                   // --- END INGREDIENTES POR COMPRAR ---
-                  
-                  Text("Descripción", style: textTheme.titleLarge),
-                  const SizedBox(height: 10),
-                  Text(
-                    widget.receta.descripcion,
-                    style: textTheme.bodyLarge?.copyWith(height: 1.5),
-                    textAlign: TextAlign.justify,
-                  ).animate().fadeIn(delay: 500.ms),
-                  const SizedBox(height: 30),
-
-                  Center(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14), textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PasosRecetaScreen(receta: widget.receta))),
-                      icon: const Icon(Icons.play_circle_fill_rounded),
-                      label: const Text("Iniciar Preparación"),
-                    )
-                  ).animate().fadeIn(delay: 600.ms).shake(hz: 3, duration: 400.ms),
-                  const Divider(height: 40, thickness: 1),
 
                   Text("Comentarios", style: textTheme.titleLarge),
                   const SizedBox(height: 15),
@@ -757,6 +817,21 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     );
   }
 
+  // Asegúrate de que esta función auxiliar esté definida en tu clase _DetalleRecetaState
+  Widget _buildNutrientRow(BuildContext context, String label, String value) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.0), // Reducido el padding vertical
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500, color: colorScheme.onSurfaceVariant)),
+          Text(value, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
 }
 
 class _DialogoRespuestaWidget extends StatefulWidget {

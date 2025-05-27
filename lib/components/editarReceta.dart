@@ -2,29 +2,31 @@ import 'dart:io'; // Necesario para File
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetas360/FirebaseServices.dart';
-import 'package:recetas360/serveis/kInputDecoration.dart'; // Asegúrate que esta importación esté
-import 'package:recetas360/serveis/ImagePickerService.dart'; // Importar
+import 'package:recetas360/serveis/kInputDecoration.dart';
+import 'package:recetas360/serveis/ImagePickerService.dart';
 import 'package:recetas360/components/Receta.dart';
-import 'package:recetas360/components/producto.dart';
-import 'package:recetas360/components/selecciondeproducto.dart';
+// import 'package:recetas360/components/producto.dart'; // Ya no se necesita
+// import 'package:recetas360/components/selecciondeproducto.dart'; // Ya no se necesita
 import 'package:recetas360/components/nutritionalifno.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:recetas360/services/gemini_service.dart'; // Importar GeminiService
 
-// --- Ingredient Selection Helper Class ---
-class IngredientSelection {
-  String name;
-  Producto? selected;
-  TextEditingController controller;
+// Clase para manejar la entrada de ingredientes (nombre y cantidad como un solo string)
+// Si esta clase ya está definida en PantallacrearReceta.dart y es accesible,
+// puedes importarla en lugar de redefinirla.
+// Por ahora, la redefino aquí para que el archivo sea autocontenido.
+class IngredientInput {
+  final TextEditingController controller;
+  String get text => controller.text.trim();
 
-  IngredientSelection({required this.name, this.selected})
-      : controller = TextEditingController(text: name);
+  IngredientInput({String initialText = ''})
+      : controller = TextEditingController(text: initialText);
 
   void dispose() {
     controller.dispose();
   }
 }
 
-// --- Edit Recipe Screen ---
 class EditarReceta extends StatefulWidget {
   final Receta receta;
   const EditarReceta({super.key, required this.receta});
@@ -39,30 +41,32 @@ class _EditarRecetaState extends State<EditarReceta> {
   late TextEditingController _nombreController;
   late TextEditingController _descripcionController;
   late TextEditingController _tiempoController;
-  late TextEditingController _categoriaController;
-  late TextEditingController _gastronomiaController;
+  late TextEditingController _categoriaController; // Se mantiene para visualización
+  late TextEditingController _gastronomiaController; // Se mantiene para visualización
 
-  List<IngredientSelection> _ingredients = [];
+  List<IngredientInput> _ingredients = []; // Cambiado de IngredientSelection
   List<TextEditingController> _stepControllers = [];
   double _calificacion = 3.0;
 
-  // --- Nuevas variables de estado para añadir pasos ---
   final TextEditingController _newStepController = TextEditingController();
   bool _isAddingNewStep = false;
   final FocusNode _newStepFocusNode = FocusNode();
-  // --- Fin nuevas variables ---
 
   File? _selectedImageFile;
   String? _currentImageUrl;
   final StorageService _storageService = StorageService();
   final ImagePickerService _imagePickerService = ImagePickerService();
+  late final GeminiService _geminiService; // Instancia de GeminiService
 
   bool _isSaving = false;
-  NutritionalInfo _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
+  bool _isCalculatingMacros = false; // Para mostrar indicador de carga de macros
+  NutritionalInfo _totalInfo = NutritionalInfo.zero();
 
   @override
   void initState() {
     super.initState();
+    _geminiService = GeminiService(); // Inicializar GeminiService
+
     _nombreController = TextEditingController(text: widget.receta.nombre);
     _currentImageUrl = widget.receta.urlImagen;
     _descripcionController = TextEditingController(text: widget.receta.descripcion);
@@ -71,10 +75,11 @@ class _EditarRecetaState extends State<EditarReceta> {
     _gastronomiaController = TextEditingController(text: widget.receta.gastronomia);
     _calificacion = widget.receta.calificacion.toDouble();
 
+    // Cargar ingredientes como strings
     _ingredients = widget.receta.ingredientes
-        .map((name) => IngredientSelection(name: name, selected: null))
+        .map((ingredienteString) => IngredientInput(initialText: ingredienteString))
         .toList();
-    if (_ingredients.isEmpty) _ingredients.add(IngredientSelection(name: ''));
+    if (_ingredients.isEmpty) _ingredients.add(IngredientInput());
 
     _stepControllers = widget.receta.pasos
         .map((step) => TextEditingController(text: step))
@@ -86,10 +91,10 @@ class _EditarRecetaState extends State<EditarReceta> {
         _totalInfo = NutritionalInfo.fromMap(widget.receta.nutritionalInfo!);
       } catch (e) {
         print("Error parsing saved nutritional info: $e");
-        _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
+        _totalInfo = NutritionalInfo.zero();
       }
     } else {
-       _totalInfo = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
+       _totalInfo = NutritionalInfo.zero();
     }
   }
 
@@ -106,25 +111,58 @@ class _EditarRecetaState extends State<EditarReceta> {
     for (var c in _stepControllers) {
       c.dispose();
     }
-    _newStepController.dispose(); // Dispose nuevo controlador
-    _newStepFocusNode.dispose(); // Dispose nuevo focus node
+    _newStepController.dispose();
+    _newStepFocusNode.dispose();
     super.dispose();
   }
 
-  void _recalcularMacros() {
-    NutritionalInfo total = NutritionalInfo(energy: 0.0, proteins: 0.0, carbs: 0.0, fats: 0.0, saturatedFats: 0.0);
-    for (var ing in _ingredients) {
-      if (ing.selected != null) {
-        total += NutritionalInfo(
-          energy: ing.selected!.valorEnergetico,
-          proteins: ing.selected!.proteinas,
-          carbs: ing.selected!.carbohidratos,
-          fats: ing.selected!.grasas,
-          saturatedFats: ing.selected!.grasasSaturadas,
+  Future<void> _recalcularMacros() async {
+    if (_isCalculatingMacros) return;
+
+    final List<String> ingredientesParaGemini = _ingredients
+        .map((ing) => ing.text)
+        .where((text) => text.isNotEmpty)
+        .toList();
+
+    if (ingredientesParaGemini.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _totalInfo = NutritionalInfo.zero();
+        });
+      }
+      return;
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isCalculatingMacros = true;
+      });
+    }
+
+    try {
+      final NutritionalInfo? infoEstimada =
+          await _geminiService.estimarMacrosDeReceta(ingredientesParaGemini);
+      if (mounted) {
+        setState(() {
+          _totalInfo = infoEstimada ?? NutritionalInfo.zero();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error al estimar macros: $e")),
         );
+        setState(() {
+          _totalInfo = NutritionalInfo.zero();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCalculatingMacros = false;
+        });
       }
     }
-    setState(() => _totalInfo = total);
   }
 
   Widget _buildIngredientRow(int index, ColorScheme colorScheme) {
@@ -137,39 +175,26 @@ class _EditarRecetaState extends State<EditarReceta> {
           Expanded(
             child: TextFormField(
               controller: ing.controller,
-              decoration: kInputDecoration(context: context, labelText: "Ingrediente ${index + 1}", isDense: true),
+              decoration: kInputDecoration(
+                  context: context,
+                  labelText: "Ingrediente ${index + 1}",
+                  hintText: "Ej: 150ml de leche", // Hint para el formato
+                  isDense: true),
               validator: (value) => (value == null || value.trim().isEmpty) ? 'Vacío' : null,
-              onChanged: (value) => ing.name = value.trim(),
-              enabled: !_isSaving,
+              // onChanged: (value) => ing.name = value.trim(), // No es necesario si se accede a ing.controller.text
+              enabled: !_isSaving && !_isCalculatingMacros,
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.search_rounded, color: colorScheme.secondary),
-            tooltip: "Buscar producto",
-            onPressed: _isSaving ? null : () async {
-              final currentName = ing.controller.text.trim();
-              if (currentName.isEmpty) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ingresa un nombre para buscar")));
-                 return;
-              }
-              FocusScope.of(context).unfocus();
-              Producto? producto = await showProductoSelection(context, currentName);
-              if (producto != null) {
-                 setState(() => ing.selected = producto);
-                 _recalcularMacros();
-              }
-            },
-             visualDensity: VisualDensity.compact,
-          ),
-          if (ing.selected != null) Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 20),
+          // El botón de búsqueda y el check se eliminan
           if (_ingredients.length > 1)
             IconButton(
               icon: Icon(Icons.remove_circle_outline_rounded, color: colorScheme.error),
               tooltip: "Quitar ingrediente",
-              onPressed: _isSaving ? null : () {
+              onPressed: _isSaving || _isCalculatingMacros ? null : () {
                  setState(() {
-                    _ingredients.removeAt(index).dispose();
-                    _recalcularMacros();
+                    _ingredients[index].dispose();
+                    _ingredients.removeAt(index);
+                    _recalcularMacros(); // Recalcular si se quita un ingrediente
                  });
               },
                visualDensity: VisualDensity.compact,
@@ -208,7 +233,7 @@ class _EditarRecetaState extends State<EditarReceta> {
     );
   }
 
-  void _addIngredient() => setState(() => _ingredients.add(IngredientSelection(name: '')));
+  void _addIngredient() => setState(() => _ingredients.add(IngredientInput()));
   
   void _addStep() {
     setState(() {
