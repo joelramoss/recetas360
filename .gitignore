@@ -48,3 +48,5 @@ app.*.map.json
 /node_modules/recetas360-dd86c-firebase-adminsdk-fbsvc-6e2fa12fdd.json
 /node_modules
 /functions/index.js
+
+.env
