@@ -40,12 +40,16 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    _initializeAnimations();
+    _initializeAnimations(); // Inicialización principal
     _controller.forward();
   }
 
   void _initializeAnimations() {
     final int n = tiposAlimento.length;
+    if (n == 0) { // Manejo por si tiposAlimento estuviera vacío
+      _bubbleAnimations = [];
+      return;
+    }
     final double intervalLength = 0.6 / n;
     const double startOffset = 0.1;
 
@@ -65,6 +69,7 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
   }
 
   void _restartAnimation() {
+    // Esta comprobación es aceptable aquí ya que _restartAnimation no es un método de build.
     if (_bubbleAnimations.length != tiposAlimento.length) {
       _initializeAnimations();
     }
@@ -153,8 +158,9 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
                         text: "Todo",
                         size: centerBubbleSize,
                         imageUrl: imagenTodo,
-                        onTap: () => _navigateTo(const PantallaGastronomias(
-                            tipoAlimento: "Todo")),
+                        // Modifica el onTap aquí:
+                        onTap: () {
+                        },
                       ).animate().scale(
                           delay: 500.ms,
                           duration: 800.ms,
@@ -180,8 +186,13 @@ class _PantallaBurbujasState extends State<Pantallaprincipal>
     final entries = tiposAlimento.entries.toList();
     final int n = entries.length;
 
+    // Se elimina la llamada a _initializeAnimations() de aquí.
+    // Se confía en que initState y _restartAnimation manejan la inicialización.
     if (_bubbleAnimations.length != n) {
-      _initializeAnimations();
+      // Esto no debería ocurrir si la lógica de estado es correcta.
+      // Devolver una lista vacía para evitar errores de rango.
+      print("Advertencia: Discrepancia en la longitud de _bubbleAnimations en _buildBurbujas. Se esperaba $n, se obtuvo ${_bubbleAnimations.length}.");
+      return [];
     }
 
     for (int i = 0; i < n; i++) {

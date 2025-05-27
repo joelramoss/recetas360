@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:recetas360/serveis/UsuarioUtil.dart';
 import 'package:recetas360/components/Receta.dart';
 import 'package:recetas360/components/DetalleReceta.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
+// Definir una clase para el resultado del procesamiento
+class ProcesadoFaltantes {
+  final List<DocumentSnapshot> docsValidos;
+  final Map<String, ({Map<String, bool> ingredientes, String? nombreReceta})>
+      datosMapa;
+  ProcesadoFaltantes(this.docsValidos, this.datosMapa);
+}
 
 class CarritoFaltantes extends StatefulWidget {
   const CarritoFaltantes({Key? key}) : super(key: key);
@@ -13,7 +23,14 @@ class CarritoFaltantes extends StatefulWidget {
 
 class _CarritoFaltantesState extends State<CarritoFaltantes> {
   final UsuarioUtil _usuarioUtil = UsuarioUtil();
-  Map<String, Map<String, bool>> _ingredientesFaltantesPorReceta = {};
+  Map<String, ({Map<String, bool> ingredientes, String? nombreReceta})>
+      _datosFaltantesPorReceta = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // _datosFaltantesPorReceta se llenará dinámicamente
+  }
 
   Stream<QuerySnapshot> _cargarRecetasFaltantes() {
     String? userId = _usuarioUtil.getUidUsuarioActual();
@@ -25,261 +42,435 @@ class _CarritoFaltantesState extends State<CarritoFaltantes> {
         .snapshots();
   }
 
-  Future<void> _actualizarIngrediente(String recetaId, String ingrediente, bool nuevoEstado) async {
+  Future<void> _actualizarIngrediente(
+      String recetaId, String ingrediente, bool nuevoEstado) async {
     String? userId = _usuarioUtil.getUidUsuarioActual();
     if (userId == null) return;
-    
-    // Verificar si este es el último ingrediente faltante
-    final ingredientesFaltantes = _ingredientesFaltantesPorReceta[recetaId] ?? {};
-    ingredientesFaltantes[ingrediente] = nuevoEstado;
-    
+
+    // Usar una copia local para la lógica de actualización, _datosFaltantesPorReceta se actualizará por el stream
+    final Map<String, bool> ingredientesActuales =
+        Map.from(_datosFaltantesPorReceta[recetaId]?.ingredientes ?? {});
+    final String nombreRecetaActual =
+        _datosFaltantesPorReceta[recetaId]?.nombreReceta ??
+            'Receta Desconocida';
+
+    ingredientesActuales[ingrediente] = nuevoEstado;
+
     final docRef = FirebaseFirestore.instance
         .collection('usuarios')
         .doc(userId)
         .collection('recetas_faltantes')
         .doc(recetaId);
-        
+
     try {
       if (nuevoEstado) {
-        // Si el ingrediente ahora es faltante, lo actualizamos/agregamos
-        await docRef.set({
-          'ingredientes': {ingrediente: true},
-          'actualizadoEn': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        // Si se marca como faltante
+        await docRef.set(
+            {
+              'ingredientes': {
+                ingrediente: true
+              }, // Solo el ingrediente que se marca como faltante
+              'actualizadoEn': FieldValue.serverTimestamp(),
+              'recetaNombre':
+                  nombreRecetaActual, // Mantener el nombre de la receta
+            },
+            SetOptions(mergeFields: [
+              'ingredientes.$ingrediente',
+              'actualizadoEn',
+              'recetaNombre'
+            ]));
       } else {
-        // Si el ingrediente ya no es faltante, lo eliminamos del documento
+        // Si se desmarca (ya no falta)
         await docRef.update({
           'ingredientes.$ingrediente': FieldValue.delete(),
+          'actualizadoEn': FieldValue.serverTimestamp(),
         });
-        
-        // Verificamos si quedan ingredientes faltantes
-        final sigueHabiendoFaltantes = ingredientesFaltantes.values.any((faltante) => faltante);
-        
-        if (!sigueHabiendoFaltantes) {
-          // Si no quedan ingredientes faltantes, eliminamos el documento completo
-          await docRef.delete();
-          setState(() {
-            _ingredientesFaltantesPorReceta.remove(recetaId);
-          });
+
+        // Verificar si quedan otros ingredientes faltantes en este documento
+        final docSnapshot = await docRef.get();
+        if (docSnapshot.exists) {
+          final dataActual = docSnapshot.data();
+          final ingredientesRestantes =
+              Map<String, dynamic>.from(dataActual?['ingredientes'] ?? {});
+          if (ingredientesRestantes.isEmpty) {
+            // Si no quedan ingredientes en el mapa
+            await docRef
+                .delete(); // Eliminar el documento de la receta de la lista de faltantes
+          }
         }
       }
     } catch (e) {
       print("Error al actualizar el ingrediente: $e");
-      // Aquí podrías mostrar un SnackBar con el error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Error al actualizar ingrediente: ${e.toString()}')),
+        );
+      }
     }
+  }
+
+  // Función asíncrona para filtrar y preparar datos
+  Future<ProcesadoFaltantes> _procesarYFiltrarRecetas(
+      List<DocumentSnapshot> docsOriginalesFaltantes) async {
+    List<DocumentSnapshot> recetasValidasParaMostrar = [];
+    Map<String, ({Map<String, bool> ingredientes, String? nombreReceta})>
+        datosFaltantesMapa = {};
+    String? currentUserId = _usuarioUtil.getUidUsuarioActual();
+
+    for (var docFaltante in docsOriginalesFaltantes) {
+      final recetaId = docFaltante.id;
+      final recetaPrincipalDoc = await FirebaseFirestore.instance
+          .collection('recetas')
+          .doc(recetaId)
+          .get();
+
+      if (recetaPrincipalDoc.exists) {
+        final dataFaltante = docFaltante.data() as Map<String, dynamic>;
+        final Map<String, dynamic> ingredientesRaw =
+            dataFaltante['ingredientes'] as Map<String, dynamic>? ?? {};
+        final Map<String, bool> ingredientesTyped = {};
+        bool tieneFaltantesMarcadosComoTrue = false;
+
+        ingredientesRaw.forEach((key, value) {
+          if (value is bool) {
+            ingredientesTyped[key] = value;
+            if (value == true) {
+              // Solo nos interesan los que están marcados como true (faltantes)
+              tieneFaltantesMarcadosComoTrue = true;
+            }
+          } else {
+            print(
+                "ADVERTENCIA: Ingrediente '$key' para receta $recetaId no es booleano, es ${value.runtimeType}. Se omitirá.");
+          }
+        });
+
+        if (tieneFaltantesMarcadosComoTrue) {
+          recetasValidasParaMostrar.add(docFaltante);
+          datosFaltantesMapa[recetaId] = (
+            ingredientes: ingredientesTyped,
+            nombreReceta: dataFaltante['recetaNombre'] as String? ??
+                recetaPrincipalDoc.data()?['nombre'] as String? ??
+                'Receta Desconocida'
+          );
+        }
+      } else {
+        // La receta principal no existe, eliminar la entrada de 'recetas_faltantes'
+        if (currentUserId != null) {
+          print(
+              "Receta $recetaId no encontrada en 'recetas'. Eliminando de 'recetas_faltantes' para usuario $currentUserId.");
+          FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(currentUserId)
+              .collection('recetas_faltantes')
+              .doc(recetaId)
+              .delete()
+              .catchError((e) => print(
+                  "Error eliminando receta faltante huérfana $recetaId: $e"));
+        }
+      }
+    }
+    return ProcesadoFaltantes(recetasValidasParaMostrar, datosFaltantesMapa);
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.orangeAccent,
-        title: const Text('Carrito de compra'),
+        title: const Text('Carrito de Compra'),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.orangeAccent,
-              Colors.pink.shade100,
-            ],
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              height: 50,
-              child: const Center(
-                child: Text(
-                  "Ingredientes Faltantes en tus Recetas",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black45,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                ),
+      body: Column(
+        children: [
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+            child: Text(
+              "Ingredientes Faltantes",
+              style: textTheme.headlineMedium?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
               ),
-            ),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _cargarRecetasFaltantes(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              textAlign: TextAlign.center,
+            ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _cargarRecetasFaltantes(),
+              builder: (context, streamSnapshot) {
+                if (streamSnapshot.connectionState == ConnectionState.waiting &&
+                    _datosFaltantesPorReceta.isEmpty) {
+                  // Mostrar carga solo si no hay datos previos
+                  return Center(
+                      child: CircularProgressIndicator(
+                          color: colorScheme.primary));
+                }
 
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        "No hay recetas con ingredientes faltantes",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                    );
-                  }
+                if (streamSnapshot.hasError) {
+                  print("Error en StreamBuilder: ${streamSnapshot.error}");
+                  return Center(
+                      child: Text("Error al cargar datos.",
+                          style: textTheme.titleMedium));
+                }
 
-                  final recetasConFaltantes = snapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final ingredientes = Map<String, bool>.from(data['ingredientes'] ?? {});
-                    _ingredientesFaltantesPorReceta[doc.id] = ingredientes;
-                    return ingredientes.values.any((faltante) => faltante);
-                  }).toList();
+                // Usar los datos del stream si están disponibles, sino mantener los últimos datos válidos para evitar parpadeo
+                final docsOriginales = streamSnapshot.data?.docs ?? [];
 
-                  if (recetasConFaltantes.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        "¡No te falta nada en tus recetas!",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                    );
-                  }
+                return FutureBuilder<ProcesadoFaltantes>(
+                  // Usar una key con los docs originales para re-ejecutar el future si cambian
+                  key: ValueKey(docsOriginales
+                      .map((d) =>
+                          d.id + (d.data() as Map<String, dynamic>).toString())
+                      .join()),
+                  future: _procesarYFiltrarRecetas(docsOriginales),
+                  builder: (context, filteredSnapshot) {
+                    if (filteredSnapshot.connectionState ==
+                            ConnectionState.waiting &&
+                        _datosFaltantesPorReceta.isEmpty) {
+                      return Center(
+                          child: CircularProgressIndicator(
+                              color: colorScheme.primary));
+                    }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: recetasConFaltantes.length,
-                    itemBuilder: (context, index) {
-                      final doc = recetasConFaltantes[index];
-                      final data = doc.data() as Map<String, dynamic>;
-                      final ingredientes = _ingredientesFaltantesPorReceta[doc.id] ?? {};
-                      final faltantes = ingredientes.entries
-                          .where((entry) => entry.value)
-                          .map((entry) => entry.key)
-                          .toList();
+                    if (filteredSnapshot.hasError) {
+                      print(
+                          "Error en FutureBuilder de filtrado: ${filteredSnapshot.error}");
+                      return Center(
+                          child: Text("Error al procesar ingredientes.",
+                              style: textTheme.titleMedium));
+                    }
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 4,
-                        child: ExpansionTile(
-                          title: Text(
-                            data['recetaNombre'] ?? 'Receta sin nombre',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          children: faltantes.map((ingrediente) {
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: ingredientes[ingrediente] == true
-                                    ? Colors.redAccent
-                                    : Colors.greenAccent,
-                                child: Icon(
-                                  ingredientes[ingrediente] == true
-                                      ? Icons.local_grocery_store
-                                      : Icons.check,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              title: Text(ingrediente),
-                              onTap: () {
-                                // Guardar el estado actual
-                                final estadoActual = ingredientes[ingrediente] ?? true;
-                                // Actualizar el estado local
-                                setState(() {
-                                  ingredientes[ingrediente] = !estadoActual;
-                                });
-                                // Actualizar en Firestore (usando el valor opuesto al actual)
-                                _actualizarIngrediente(doc.id, ingrediente, !estadoActual);
-                              },
-                              onLongPress: () {
-                                FirebaseFirestore.instance
-                                    .collection('recetas')
-                                    .doc(doc.id)
-                                    .get()
-                                    .then((recetaDoc) {
-                                  if (recetaDoc.exists) {
-                                    final recetaData = recetaDoc.data()!;
-                                    recetaData['id'] = recetaDoc.id;
+                    // Actualizar el estado _datosFaltantesPorReceta si el Future completó con nuevos datos
+                    if (filteredSnapshot.connectionState ==
+                            ConnectionState.done &&
+                        filteredSnapshot.hasData) {
+                      _datosFaltantesPorReceta =
+                          filteredSnapshot.data!.datosMapa;
+                    }
 
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => DetalleReceta(
-                                          receta: Receta.fromFirestore(recetaData, recetaDoc.id),
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Esta receta ya no está disponible'),
-                                      ),
-                                    );
-                                  }
-                                }).catchError((error) {
-                                  print("Error al cargar detalles de receta: $error");
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Error al cargar la receta'),
-                                    ),
-                                  );
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
+                    // Usar la lista de documentos válidos del snapshot del Future si está disponible,
+                    // o una lista vacía si no, para evitar errores.
+                    final List<DocumentSnapshot> recetasParaMostrar =
+                        filteredSnapshot.data?.docsValidos ?? [];
+
+                    if (recetasParaMostrar.isEmpty &&
+                        filteredSnapshot.connectionState ==
+                            ConnectionState.done) {
+                      return Center(
+                        child: Text(
+                          "¡No te falta nada!",
+                          style: textTheme.titleMedium
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ).animate().fadeIn(delay: 100.ms),
                       );
+                    }
+                    if (recetasParaMostrar.isEmpty &&
+                        filteredSnapshot.connectionState ==
+                            ConnectionState.waiting) {
+                      // Si está esperando y no hay nada que mostrar aún, puede ser el loader o nada si ya había datos
+                      return _datosFaltantesPorReceta.isEmpty
+                          ? Center(
+                              child: CircularProgressIndicator(
+                                  color: colorScheme.primary))
+                          : _buildListView(
+                              _datosFaltantesPorReceta.keys
+                                  .map((id) {
+                                    // Intenta construir con datos viejos si existen
+                                    try {
+                                      return docsOriginales
+                                          .firstWhere((doc) => doc.id == id);
+                                    } catch (_) {
+                                      // If not found, firstWhere throws StateError
+                                      return null;
+                                    }
+                                  })
+                                  .whereType<DocumentSnapshot>()
+                                  .toList(),
+                              colorScheme,
+                              textTheme);
+                    }
+
+                    return _buildListView(
+                        recetasParaMostrar, colorScheme, textTheme);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListView(List<DocumentSnapshot> recetasAMostrar,
+      ColorScheme colorScheme, TextTheme textTheme) {
+    if (recetasAMostrar.isEmpty && _datosFaltantesPorReceta.isNotEmpty) {
+      // Si recetasAMostrar está vacío pero _datosFaltantesPorReceta no,
+      // significa que el Future aún no ha terminado o no devolvió nada,
+      // pero tenemos datos antiguos. Intentamos construir con ellos.
+      // Esto es para reducir el parpadeo.
+      final docsParaReconstruir = _datosFaltantesPorReceta.keys
+          .map((id) {
+            // Necesitamos encontrar el DocumentSnapshot original para pasarlo al itemBuilder
+            // Esto es un poco hacky y depende de que el stream original aún tenga esos docs.
+            // Una mejor solución a largo plazo sería cachear los DocumentSnapshot junto con los datos procesados.
+            // Por ahora, si no lo encontramos, lo omitimos.
+            try {
+              return (ModalRoute.of(context)?.settings.arguments
+                      as Stream<QuerySnapshot>?)
+                  ?.firstWhere((event) => event.docs.any((d) => d.id == id))
+                  .then((event) => event.docs.firstWhere((d) => d.id == id))
+                  .catchError((_) =>
+                      null); // Esto es muy complejo y no funcionará bien.
+            } catch (_) {
+              return null;
+            }
+            return null; // Simplificación: si no hay docs nuevos, no mostramos nada o el loader
+          })
+          .whereType<DocumentSnapshot>()
+          .toList();
+      // Si no podemos reconstruir, mostramos loader o mensaje.
+      // Esta lógica de reconstrucción con datos viejos es compleja y propensa a errores.
+      // Es mejor confiar en el FutureBuilder y manejar sus estados.
+    }
+
+    // Si recetasAMostrar está vacío (y el Future ya terminó), el mensaje de "No te falta nada" se maneja arriba.
+    // Si está esperando y recetasAMostrar está vacío, el loader se maneja arriba.
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      itemCount: recetasAMostrar.length,
+      itemBuilder: (context, index) {
+        final doc = recetasAMostrar[index];
+        final recetaId = doc.id;
+        final datosRecetaFaltante = _datosFaltantesPorReceta[recetaId];
+
+        if (datosRecetaFaltante == null) {
+          // Esto no debería ocurrir si _datosFaltantesPorReceta se llena correctamente
+          // desde el FutureBuilder
+          return const SizedBox.shrink();
+        }
+
+        final ingredientes = datosRecetaFaltante.ingredientes;
+        final nombreReceta =
+            datosRecetaFaltante.nombreReceta ?? 'Receta sin nombre';
+
+        // Filtrar solo los ingredientes marcados como true (faltantes) para este ExpansionTile
+        final faltantesEnEsteTile = ingredientes.entries
+            .where((entry) => entry.value == true)
+            .map((entry) => entry.key)
+            .toList();
+
+        if (faltantesEnEsteTile.isEmpty) {
+          // Si esta receta específica ya no tiene ingredientes faltantes (todos desmarcados)
+          // no debería mostrarse. _procesarYFiltrarRecetas ya debería manejar esto.
+          return const SizedBox.shrink();
+        }
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+          clipBehavior: Clip.antiAlias,
+          child: ExpansionTile(
+            backgroundColor: colorScheme.surfaceContainerLowest,
+            collapsedBackgroundColor: colorScheme.surface,
+            iconColor: colorScheme.primary,
+            collapsedIconColor: colorScheme.onSurfaceVariant,
+            title: Text(
+              nombreReceta,
+              style:
+                  textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            children: faltantesEnEsteTile
+                .map((ingrediente) {
+                  final esFaltante = ingredientes[ingrediente] ??
+                      false; // Debería ser true aquí
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
+                    leading: CircleAvatar(
+                      backgroundColor: esFaltante
+                          ? colorScheme.errorContainer
+                          : colorScheme
+                              .primaryContainer, // No debería llegar a primaryContainer aquí
+                      child: Icon(
+                        esFaltante
+                            ? Icons.remove_shopping_cart_outlined
+                            : Icons.check_circle_outline_rounded,
+                        color: esFaltante
+                            ? colorScheme.onErrorContainer
+                            : colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    title: Text(ingrediente, style: textTheme.bodyLarge),
+                    onTap: () {
+                      _actualizarIngrediente(
+                          recetaId, ingrediente, !esFaltante);
+                    },
+                    onLongPress: () {
+                      FirebaseFirestore.instance
+                          .collection('recetas')
+                          .doc(recetaId) // Usar recetaId que es doc.id
+                          .get()
+                          .then((recetaDoc) {
+                        if (recetaDoc.exists) {
+                          final recetaData = recetaDoc.data()!;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DetalleReceta(
+                                receta: Receta.fromFirestore(
+                                    recetaData, recetaDoc.id),
+                              ),
+                            ),
+                          );
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Esta receta ya no está disponible',
+                                    style:
+                                        TextStyle(color: colorScheme.onError)),
+                                backgroundColor: colorScheme.error,
+                              ),
+                            );
+                          }
+                        }
+                      }).catchError((error) {
+                        print("Error al cargar detalles de receta: $error");
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error al cargar la receta',
+                                  style: TextStyle(color: colorScheme.onError)),
+                              backgroundColor: colorScheme.error,
+                            ),
+                          );
+                        }
+                      });
                     },
                   );
-                },
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Placeholder action: muestra un SnackBar
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Información enviada (funcionalidad placeholder)'),
-                    ),
-                  );
-                  // Aquí puedes agregar la lógica para enviar la información
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 4,
-                ),
-                child: const Text(
-                  'Enviar Información',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+                })
+                .toList()
+                .animate(interval: 50.ms)
+                .fadeIn()
+                .slideX(begin: 0.1),
+          ),
+        )
+            .animate()
+            .fadeIn(delay: (index * 50).ms, duration: 300.ms)
+            .slideY(begin: 0.1);
+      },
     );
   }
 }

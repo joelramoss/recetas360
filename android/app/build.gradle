@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.example.recetas360"
-    compileSdk = flutter.compileSdkVersion
+    compileSdkVersion flutter.compileSdkVersion // Or a specific number
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -28,7 +28,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        targetSdkVersion flutter.targetSdkVersion // Or a specific number
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
