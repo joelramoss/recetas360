@@ -1,6 +1,3 @@
-// recipe_nutrition_service.dart
-// Ya no necesitas importar 'apiservice.dart' ni 'producto.dart' aquí
-// si getRecipeNutritionalInfo se elimina.
 
 class NutritionalInfo {
   final double energy;

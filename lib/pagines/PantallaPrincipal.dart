@@ -9,8 +9,6 @@ import 'package:recetas360/widgetsutilizados/burbujaestilo.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:13:49
 
 class Pantallaprincipal extends StatefulWidget {
   const Pantallaprincipal({super.key});

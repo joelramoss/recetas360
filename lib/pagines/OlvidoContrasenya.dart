@@ -3,8 +3,6 @@ import 'package:recetas360/pagines/PaginaLogin.dart'; // Import de la página de
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:43:29
 
 
 /// OLA INFERIOR #1 (Clipper remains the same)
