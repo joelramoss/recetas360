@@ -6,9 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:intl/date_symbol_data_local.dart'; // Import for initializeDateFormatting
 import 'package:flutter_animate/flutter_animate.dart'; // Import animate
+import 'package:recetas360/FirebaseServices.dart'; // Asegurar que este import está presente
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:45:14
 
 class HistorialRecetas extends StatefulWidget {
   const HistorialRecetas({super.key});
@@ -39,8 +38,8 @@ class AggregatedCompletedRecipe {
 }
 
 class _HistorialRecetasState extends State<HistorialRecetas> {
-  // Date formatter
-  DateFormat? _dateFormatter;
+  // Ya no necesitas un DateFormat local
+  // DateFormat? _dateFormatter;
   bool _isDateFormatterInitialized = false;
 
   @override
@@ -50,22 +49,12 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
   }
 
   Future<void> _initializeDateFormatter() async {
-    try {
-      await initializeDateFormatting('es_ES', null);
-      if (mounted) {
-        setState(() {
-          _dateFormatter = DateFormat('dd/MM/yyyy HH:mm', 'es_ES');
-          _isDateFormatterInitialized = true;
-        });
-      }
-    } catch (e) {
-      print("Error initializing date formatter: $e");
-      if (mounted) {
-        setState(() {
-          _dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
-          _isDateFormatterInitialized = true;
-        });
-      }
+    // Usar la función centralizada
+    await FirebaseService.inicializarFormatoFecha();
+    if (mounted) {
+      setState(() {
+        _isDateFormatterInitialized = true;
+      });
     }
   }
 
@@ -100,7 +89,7 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isDateFormatterInitialized || _dateFormatter == null) {
+    if (!_isDateFormatterInitialized) {
       return Scaffold(
         appBar: AppBar(title: const Text('Historial de Recetas')),
         body: const Center(child: CircularProgressIndicator()),
@@ -315,8 +304,8 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
                           ),
                           children: recetasAgregadas.map((aggRecipe) {
                             final fechaOriginalUltima = aggRecipe.latestTimestamp.toDate();
-                            final fechaAjustadaUltima = fechaOriginalUltima.add(const Duration(hours: 2));
-                            final ultimaFechaFormateada = _dateFormatter!.format(fechaAjustadaUltima);
+                            // No se suma ninguna duración, se usa la fecha tal cual está almacenada
+                            final ultimaFechaFormateada = FirebaseService.formatearFechaLocal(fechaOriginalUltima);
                             final countText = aggRecipe.completionCount > 1 ? " (x${aggRecipe.completionCount})" : "";
 
                             Widget tileContent = ListTile(
@@ -383,11 +372,11 @@ class _HistorialRecetasState extends State<HistorialRecetas> {
                                 childrenPadding: const EdgeInsets.only(left: 48, right: 16, bottom: 8, top:4), // Mayor indentación
                                 children: aggRecipe.allCompletionTimestamps.map((timestamp) {
                                   final fechaOriginalItem = timestamp.toDate();
-                                  final fechaAjustadaItem = fechaOriginalItem.add(const Duration(hours: 2));
+                                  // No se suma ninguna duración, se usa la fecha tal cual está almacenada
                                   return ListTile(
                                     dense: true,
                                     leading: const Icon(Icons.check_circle_outline, size: 16),
-                                    title: Text(_dateFormatter!.format(fechaAjustadaItem), style: textTheme.bodySmall),
+                                    title: Text(FirebaseService.formatearFechaLocal(fechaOriginalItem), style: textTheme.bodySmall),
                                   );
                                 }).toList(),
                               );

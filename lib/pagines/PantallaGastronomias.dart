@@ -9,8 +9,6 @@ import 'package:recetas360/pagines/PantallacrearReceta.dart'; // Import CrearRec
 import 'package:recetas360/widgetsutilizados/burbujaestilo.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:18:52
 
 class PantallaGastronomias extends StatefulWidget {
   final String tipoAlimento;

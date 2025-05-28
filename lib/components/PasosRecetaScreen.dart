@@ -5,7 +5,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:recetas360/components/Receta.dart';
-// Change this import
 import 'package:just_audio/just_audio.dart';
 
 

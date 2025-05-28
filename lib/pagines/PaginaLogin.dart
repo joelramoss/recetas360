@@ -6,8 +6,7 @@ import 'package:recetas360/pagines/PantallaPrincipal.dart'; // Corrected import 
 import 'package:recetas360/pagines/PaginaRegistro.dart'; // Corrected import name
 import 'package:flutter_animate/flutter_animate.dart'; // Import animate
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 14:41:09
+
 
 class Paginalogin extends StatefulWidget {
   const Paginalogin({super.key});

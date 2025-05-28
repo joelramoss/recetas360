@@ -5,11 +5,9 @@ import 'package:recetas360/FirebaseServices.dart';
 import 'package:recetas360/serveis/kInputDecoration.dart';
 import 'package:recetas360/serveis/ImagePickerService.dart';
 import 'package:recetas360/components/Receta.dart';
-// import 'package:recetas360/components/producto.dart'; // Ya no se necesita
-// import 'package:recetas360/components/selecciondeproducto.dart'; // Ya no se necesita
 import 'package:recetas360/components/nutritionalifno.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:recetas360/services/gemini_service.dart'; // Importar GeminiService
+import 'package:recetas360/services/gemini_service.dart'; 
 
 // Clase para manejar la entrada de ingredientes (nombre y cantidad como un solo string)
 // Si esta clase ya está definida en PantallacrearReceta.dart y es accesible,

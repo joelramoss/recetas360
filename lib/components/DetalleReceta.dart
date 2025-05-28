@@ -9,9 +9,8 @@ import 'package:flutter_animate/flutter_animate.dart'; // Import flutter_animate
 import 'package:shimmer/shimmer.dart'; // Import shimmer for comment loading
 import 'package:intl/date_symbol_data_local.dart'; // Necesario para initializeDateFormatting
 import 'package:recetas360/components/nutritionalifno.dart'; // Asegúrate que esta importación esté presente
+import 'package:recetas360/FirebaseServices.dart'; // Asegurar que este import está presente
 
-// Current User's Login: joelramoss
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-24 15:04:29
 
 class DetalleReceta extends StatefulWidget {
   final Receta receta;
@@ -41,7 +40,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
   @override
   void initState() {
     super.initState();
-    _initializeDateFormatting(); // Llama a la inicialización aquí
+    _initializeDateFormatting(); // Seguimos llamándola para inicializar el formato
     _uidActual = _usuarioUtil.getUidUsuarioActual();
     _cargarIngredientesFaltantes(); 
     _cargarComentariosIniciales();
@@ -50,20 +49,8 @@ class _DetalleRecetaState extends State<DetalleReceta> {
 
   // Nuevo método para encapsular la inicialización
   Future<void> _initializeDateFormatting() async {
-    try {
-      // Inicializa para el locale 'es_ES'.
-      // El segundo parámetro `null` significa que usará los datos de formato por defecto para ese locale.
-      await initializeDateFormatting('es_ES', null);
-      print("Formato de fecha inicializado para 'es_ES'.");
-      // Si quieres soportar múltiples locales o el locale por defecto del sistema de forma más robusta,
-      // podrías necesitar una lógica más avanzada aquí o llamar a initializeDateFormatting
-      // para el locale detectado del dispositivo.
-    } catch (e) {
-      print("Error al inicializar el formato de fecha para 'es_ES': $e");
-      // Considera si necesitas manejar este error de alguna manera específica.
-      // Incluso si esto falla, el DateFormat sin locale en tu fallback debería funcionar
-      // con el formato por defecto del sistema, pero la conversión .toLocal() sigue siendo la clave.
-    }
+    // Ahora usamos el método estático de FirebaseService
+    await FirebaseService.inicializarFormatoFecha();
   }
 
   Future<void> _cargarIngredientesFaltantes() async {
@@ -211,25 +198,6 @@ class _DetalleRecetaState extends State<DetalleReceta> {
     }
   }
 
-  String _formatearFecha(DateTime fecha) {
-    try {
-      // Imprime la fecha original UTC para depuración
-      print("Fecha Original (UTC desde Firestore): ${fecha.toIso8601String()}");
-
-      // Sumar 2 horas directamente a la fecha UTC
-      final fechaConDosHorasMas = fecha.add(const Duration(hours: 2));
-      print("Fecha con 2 horas sumadas: ${fechaConDosHorasMas.toIso8601String()}");
-      
-      // Formatear esta nueva fecha. Ya no se llama a .toLocal()
-      return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(fechaConDosHorasMas);
-    } catch (e) {
-       print("Error formateando fecha con intl locale 'es_ES': $e. Usando formato simple.");
-       // Fallback, también sumando 2 horas
-       final fechaConDosHorasMasFallback = fecha.add(const Duration(hours: 2));
-       return DateFormat('dd/MM/yyyy HH:mm').format(fechaConDosHorasMasFallback);
-    }
-  }
-
   Future<void> _agregarComentario(String comentarioTexto) async {
     if (_uidActual == null || !mounted) return;
     final colorScheme = Theme.of(context).colorScheme;
@@ -239,7 +207,8 @@ class _DetalleRecetaState extends State<DetalleReceta> {
 
       Map<String, dynamic> nuevoComentarioData = {
         'comentario': comentarioTexto, 'usuarioId': _uidActual, 'usuarioNombre': nombreUsuario,
-        'fecha': FieldValue.serverTimestamp(), 'esRespuesta': false, 'comentarioPadreId': null,
+        'fecha': Timestamp.fromDate(DateTime.now()), // Usar hora local del dispositivo
+        'esRespuesta': false, 'comentarioPadreId': null,
       };
       await _comentariosCollectionRef.add(nuevoComentarioData);
       if (!mounted) return;
@@ -267,7 +236,8 @@ class _DetalleRecetaState extends State<DetalleReceta> {
 
        Map<String, dynamic> nuevaRespuestaData = {
         'comentario': respuestaTexto, 'usuarioId': _uidActual, 'usuarioNombre': nombreUsuario,
-        'fecha': FieldValue.serverTimestamp(), 'esRespuesta': true, 'comentarioPadreId': comentarioPadreId,
+        'fecha': Timestamp.fromDate(DateTime.now()), // Usar hora local del dispositivo
+        'esRespuesta': true, 'comentarioPadreId': comentarioPadreId,
        };
        await _comentariosCollectionRef.add(nuevaRespuestaData);
        if (!mounted) return;
@@ -434,7 +404,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(_formatearFecha(fecha), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+                      Text(FirebaseService.formatearFechaLocal(fecha), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
                       TextButton.icon(
                         onPressed: () => _mostrarDialogoRespuesta(doc.id, nombreUsuario),
                         icon: Icon(Icons.reply_rounded, size: 16, color: colorScheme.primary),
@@ -490,7 +460,7 @@ class _DetalleRecetaState extends State<DetalleReceta> {
                            const SizedBox(height: 6),
                            Text(respuestaTexto, style: textTheme.bodySmall),
                            const SizedBox(height: 6),
-                           Align(alignment: Alignment.centerRight, child: Text(_formatearFecha(fechaRespuesta), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant))),
+                           Align(alignment: Alignment.centerRight, child: Text(FirebaseService.formatearFechaLocal(fechaRespuesta), style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant))),
                          ],
                        ),
                      ),

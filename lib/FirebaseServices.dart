@@ -3,10 +3,46 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_analytics/firebase_analytics.dart'; // Necesario para el log de errores
+import 'package:intl/intl.dart'; // Para DateFormat
+import 'package:intl/date_symbol_data_local.dart'; // Para locale
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  static bool _isDateFormattingInitialized = false;
+
+  // Nueva función para inicializar el formato de fecha (si es necesario)
+  static Future<void> inicializarFormatoFecha() async {
+    if (!_isDateFormattingInitialized) {
+      try {
+        await initializeDateFormatting('es_ES', null);
+        _isDateFormattingInitialized = true;
+        print("FirebaseService: Formato de fecha inicializado para 'es_ES'");
+      } catch (e) {
+        print("FirebaseService: Error al inicializar el formato de fecha: $e");
+      }
+    }
+  }
+
+  // Nueva función centralizada para formatear fechas en hora local
+  static String formatearFechaLocal(DateTime fecha) {
+    // Asegurarse de que la inicialización se ha intentado
+    if (!_isDateFormattingInitialized) {
+      print("Advertencia: Se está formateando una fecha sin inicializar el sistema de formatos. Se recomienda llamar a inicializarFormatoFecha() primero.");
+    }
+    
+    try {
+      // Convertir la fecha a hora local del dispositivo
+      final fechaLocal = fecha.toLocal();
+      
+      // Formatear usando locale es_ES
+      return DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(fechaLocal);
+    } catch (e) {
+      print("Error formateando fecha con locale 'es_ES': $e. Usando formato simple.");
+      // Fallback: usar formato básico pero aún con hora local
+      return DateFormat('dd/MM/yyyy HH:mm').format(fecha.toLocal());
+    }
+  }
 
   // Método para guardar una receta favorita de un usuario
   Future<void> guardarRecetaFavorita(String recetaId) async {
